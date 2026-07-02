@@ -1,0 +1,4 @@
+{
+  "description": "汎用デフォルト: 共有 checkout 上でブロックするトップレベルディレクトリ",
+  "protected_dirs": ["src", "tests"]
+}
