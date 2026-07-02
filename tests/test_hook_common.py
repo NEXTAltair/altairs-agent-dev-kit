@@ -53,3 +53,8 @@ def test_load_hook_rules_default_plus_override(tmp_path, monkeypatch):
 def test_load_hook_rules_missing_files(tmp_path, monkeypatch):
     monkeypatch.setattr(hook_common, "DEFAULT_RULES_DIR", tmp_path / "none")
     assert hook_common.load_hook_rules("pre_commands", tmp_path) == {}
+
+
+def test_get_log_dir(tmp_path):
+    assert hook_common.get_log_dir(tmp_path) == tmp_path / ".claude" / "logs"
+    assert not (tmp_path / ".claude" / "logs").exists()  # mkdir しない契約
