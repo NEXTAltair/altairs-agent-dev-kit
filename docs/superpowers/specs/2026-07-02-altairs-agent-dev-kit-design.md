@@ -8,6 +8,18 @@
 
 LoRAIro (`NEXTAltair/LoRAIro`) に蓄積された AI エージェント向け開発標準 (skills / rules / hooks / agents / Codex 設定) から、プロジェクト非依存の部分を抽出して単一リポジトリ `NEXTAltair/altairs-agent-dev-kit` として配布する。新規・既存を問わず任意のリポジトリへ導入でき、更新を追従できる形にする。
 
+## 設計原則 (LoRAIro の ADR / Issue 調査から抽出)
+
+LoRAIro の開発環境系 ADR 13本と発端 Issue (#222, #247, #288, #291, #594, #275, #777 等) の調査から、本 kit が引き継ぐ普遍原則を明文化する。
+
+1. **事故 → 原則 → 機械的強制**: ルールは実際の事故を発端とし、人間やエージェントの注意力ではなく hook で機械的にブロックする (例: 並列 `uv run --active` による venv 破損 → hook ブロック)
+2. **更新頻度で文書層を分ける**: 指針層 (CLAUDE.md 相当) / 詳細層 (rules) / 実装層 (hook コード) を分離し、頻度の違う情報を混ぜない (LoRAIro ADR 0008 の思想)
+3. **frontmatter = SSoT、索引は生成物**: メタデータは frontmatter に一本化し、索引の手編集を禁止する (okf-bundle スキルが担う。LoRAIro ADR 0069/0082)
+4. **コマンド形状を変えず環境で設定する**: エージェント CLI の承認摩擦を避けるため、env prefix を毎回付けるのではなく設定ファイルに1回常設する (LoRAIro ADR 0051)
+5. **設定と文書の整合を lint する**: 「rules が約束する env/hook 配線が settings に実在するか」を検証するチェックを提供する。LoRAIro では設定の巻き戻り事故 (settings.json から env と hook 配線が消えたのに rules は「設定済み」と書いたまま) が実際に起きており、この lint はその再発防止策
+
+原則 5 は本 kit の新規機能。1〜4 は LoRAIro で実証済みの運用の抽出。
+
 ## 基本方針: 2層構造
 
 本リポジトリには **プロジェクト名・絶対パス・Issue 番号・ADR 番号を一切含めない普遍的な内容だけ** を置く。
@@ -83,6 +95,8 @@ altairs-agent-dev-kit/
 │   ├── config.toml.template
 │   ├── agents/*.toml               # Codex 用 agent 定義 (agents/*.md と対)
 │   └── hooks/                      # Codex 用 hook (Claude 用と共通実装を参照)
+├── scripts/
+│   └── check_config_consistency.py # 設計原則5の整合 lint (rules ⇔ settings.json ⇔ hook 配線)
 ├── install.sh
 ├── README.md
 └── docs/
@@ -97,7 +111,7 @@ altairs-agent-dev-kit/
 | 種別 | 内容 | 汎用化の要点 |
 |---|---|---|
 | skills 13 本 | 上記 `skills/` 一覧 | SKILL.md 本文の LoRAIro 固有記述 (プロジェクト名・`local_packages` パス・CI filter 表・ADR 番号) をプレースホルダまたは「プロジェクト層で定義」への参照に置換 |
-| rules 8 本 | `.claude/rules/*.md` | 具体パス・具体コマンド・Issue 事例を除去し原則と判断フローを残す。事例は「導入先で追記する」ことを明記 |
+| rules 8 本 | `.claude/rules/*.md` | 具体パス・具体コマンド・Issue 事例を除去し原則と判断フローを残す。事例は「導入先で追記する」ことを明記。venv/実行環境の分離粒度 (worktree 間・package 間) は LoRAIro で ADR 0024/0051 に分散していたため、kit では 1 ドキュメント (parallel-execution.md) に集約する |
 | hooks 5 本 | `.claude/hooks/*.py` + rules JSON | 後述「hook の汎用化」 |
 | agents 10 本 | `.claude/agents/*.md` / `.codex/agents/*.toml` | 本文中のリポジトリルール参照 (`../../AGENTS.md` 等) を「導入先の AGENTS.md / rules を読む」という相対的な記述に変更 |
 | Codex 設定 | `.codex/config.toml` | 共有 venv パス等をテンプレート変数化 (`{{PROJECT_ROOT}}` 等) |
@@ -131,6 +145,7 @@ altairs-agent-dev-kit/
 - **hook**: pytest でユニットテスト (ルート検出・ルールマージ・ブロック判定)。LoRAIro の既存 hook 挙動と同等であることを fixture で確認
 - **install.sh**: 一時ディレクトリの空 git repo に対して導入 → 期待ファイル配置を assert する smoke テスト (bash または pytest)
 - **skills**: SKILL.md frontmatter の必須フィールド (name / description) を検証する lint スクリプト
+- **設定整合 lint** (`scripts/check_config_consistency.py`): 導入先で実行し、(a) rules が前提とする env 変数が settings に定義されているか、(b) hooks ディレクトリの各スクリプトが settings の hook 配線に登録されているか (未配線の死んだ hook 検出)、(c) settings が参照する hook スクリプトが実在するか、を検証。kit 自身の CI でも fixture リポジトリに対して実行
 - **CI**: GitHub Actions で上記を実行
 
 ## 決定事項
@@ -142,3 +157,6 @@ altairs-agent-dev-kit/
 | 配布方式 | Claude Code プラグイン + skills.sh + install.sh の 3 経路 |
 | 汎用化方針 | 汎用コア + プロジェクト層の 2 層構造 |
 | サードパーティ skills | 再配布せずインストールリストとして文書化 |
+| ライセンス | 設定しない (私的利用。公開リポジトリだが法的には全権利保持) |
+| 記述言語 | 日本語主体 (README のみ必要なら英語併記可) |
+| 設定整合 lint | 新規機能として同梱 (LoRAIro の settings 巻き戻り事故が動機) |
