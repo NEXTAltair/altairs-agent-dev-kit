@@ -31,3 +31,30 @@ def test_existing_file_not_overwritten(tmp_path):
     assert result.returncode == 0
     assert (rules / "git-workflow.md").read_text(encoding="utf-8") == "custom"
     assert "SKIP" in result.stdout
+
+
+def test_empty_source_glob_does_not_crash(tmp_path):
+    # rules が空でも --rules がクラッシュせず正常終了する (nullglob)
+    import shutil
+    kit_copy = tmp_path / "kit"
+    shutil.copytree(KIT, kit_copy, ignore=shutil.ignore_patterns(".git", ".venv", "rules"))
+    (kit_copy / "rules").mkdir()
+    target = tmp_path / "target"
+    target.mkdir()
+    result = subprocess.run(
+        ["bash", str(kit_copy / "install.sh"), "--target", str(target), "--rules"],
+        capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stderr
+    assert "DONE" in result.stdout
+
+
+def test_codex_target_with_ampersand(tmp_path):
+    # --codex で特殊文字を含むパスが正しく処理される
+    target = tmp_path / "a&b"
+    target.mkdir()
+    result = run_install(target, "--codex")
+    assert result.returncode == 0, result.stderr
+    config = (target / ".codex" / "config.toml").read_text(encoding="utf-8")
+    assert str(target) in config
+    assert "{{PROJECT_ROOT}}" not in config

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # altairs-agent-dev-kit installer: rules / agents / hooks / codex を導入先へ展開する
 set -euo pipefail
+shopt -s nullglob
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="" ; DO_RULES=0 ; DO_AGENTS=0 ; DO_HOOKS=0 ; DO_CODEX=0 ; FORCE=0
@@ -53,7 +54,12 @@ if [[ "$DO_CODEX" -eq 1 ]]; then
   mkdir -p "$TARGET/.codex/agents"
   dest="$TARGET/.codex/config.toml"
   [[ -e "$dest" && "$FORCE" -eq 0 ]] && dest="$dest.new"
-  sed "s|{{PROJECT_ROOT}}|$TARGET|g" "$KIT_DIR/codex/config.toml.template" > "$dest"
+  python3 - "$KIT_DIR/codex/config.toml.template" "$TARGET" > "$dest" <<'PYEOF'
+import sys
+from pathlib import Path
+template, target = sys.argv[1], sys.argv[2]
+print(Path(template).read_text(encoding="utf-8").replace("{{PROJECT_ROOT}}", target), end="")
+PYEOF
   echo "INSTALL: $dest"
   for f in "$KIT_DIR"/codex/agents/*.toml; do copy_file "$f" "$TARGET/.codex/agents/$(basename "$f")"; done
 fi
