@@ -6,12 +6,15 @@ from pathlib import Path
 HOOK = Path(__file__).parent.parent / "hooks" / "scripts" / "hook_pre_commands.py"
 
 
-def run_hook(command: str, cwd: Path) -> subprocess.CompletedProcess:
+def run_hook(command: str, cwd: Path, extra_env: dict | None = None) -> subprocess.CompletedProcess:
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    env = {"CLAUDE_PROJECT_DIR": str(cwd), "PATH": "/usr/bin:/bin"}
+    if extra_env:
+        env.update(extra_env)
     return subprocess.run(
         [sys.executable, str(HOOK)], input=payload,
         capture_output=True, text=True, cwd=cwd, timeout=10,
-        env={"CLAUDE_PROJECT_DIR": str(cwd), "PATH": "/usr/bin:/bin"},
+        env=env,
     )
 
 
@@ -36,3 +39,33 @@ def test_project_override_adds_block(tmp_path):
     result = run_hook("pip install requests", tmp_path)
     assert result.returncode == 2
     assert "pip" in result.stderr
+
+
+def test_draft_pr_blocked_by_default(tmp_path):
+    result = run_hook("gh pr create --draft --title x", tmp_path)
+    assert result.returncode == 2
+    assert "draft" in result.stderr
+
+
+def test_draft_pr_allowed_when_disabled(tmp_path):
+    rules_dir = tmp_path / ".claude" / "hooks" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "pre_commands.json").write_text(
+        json.dumps({"block_draft_pr": False}), encoding="utf-8")
+    result = run_hook("gh pr create --draft --title x", tmp_path)
+    assert result.returncode == 0
+
+
+def test_worktree_uv_guard_blocks_bare_uv(tmp_path):
+    rules_dir = tmp_path / ".claude" / "hooks" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "pre_commands.json").write_text(
+        json.dumps({"worktree_uv_guard": True}), encoding="utf-8")
+    worktree_dir = tmp_path / ".agents" / "worktree" / "wt1"
+    worktree_dir.mkdir(parents=True)
+    result = run_hook(
+        "uv run pytest", worktree_dir,
+        extra_env={"CLAUDE_PROJECT_DIR": str(tmp_path)},
+    )
+    assert result.returncode == 2
+    assert "worktree" in result.stderr
