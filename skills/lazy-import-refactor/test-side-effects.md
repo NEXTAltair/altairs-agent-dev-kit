@@ -111,7 +111,7 @@ def test_import_does_not_eager_load_torch():
 
 同一 pytest session 内で既に他テストが torch を import 済みだと `sys.modules` に残留して検出不能になるため、fresh interpreter を subprocess で起動して検証する。
 
-iam-lib では `tests/unit/core/test_lazy_torch_import.py` で本パターンを採用 (PR #62)。
+実プロジェクトの test で本パターンの採用例がある。
 
 ## 判定フロー
 

@@ -16,4 +16,4 @@ jobs:
       - name: 汎用性 grep gate (kit 本体にプロジェクト固有文字列を残さない)
         run: |
           ! grep -rn "LoRAIro\|lorairo\|/workspaces/" \
-            skills/ rules/ hooks/ agents/ codex/ scripts/ install.sh
+            skills/ rules/ hooks/ agents/ codex/ scripts/ install.sh README.md .claude-plugin/

@@ -66,6 +66,9 @@ kit が同梱する `hooks/rules/*.default.json` は言語非依存の安全最�
 `hooks/rules/<name>.default.json` (kit 側) と `<project_root>/.claude/hooks/rules/<name>.json`
 (導入先 override) を深いマージ (list は連結、dict は再帰マージ) で合成する。
 override ファイルを置くだけで有効化でき、kit 側のデフォルトファイルは編集不要。
+override の list は default の list に **連結** される (置換ではない)。default 側の
+個別エントリを無効化したい場合は override だけでは実現できず、kit の default JSON 自体を
+編集した fork を使う必要がある。
 
 ### `.claude/hooks/rules/pre_commands.json` — uv ガード等の有効化例
 
