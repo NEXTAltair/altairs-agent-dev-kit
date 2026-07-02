@@ -1,4 +1,6 @@
+import json
 import subprocess
+import sys
 from pathlib import Path
 
 KIT = Path(__file__).parent.parent
@@ -58,3 +60,27 @@ def test_codex_target_with_ampersand(tmp_path):
     config = (target / ".codex" / "config.toml").read_text(encoding="utf-8")
     assert str(target) in config
     assert "{{PROJECT_ROOT}}" not in config
+
+
+def test_installed_hooks_flat_layout_resolves_default_rules(tmp_path):
+    # install.sh --hooks はスクリプトを <target>/.claude/hooks/*.py に、
+    # default rules を <target>/.claude/hooks/rules/*.default.json にフラット配置する。
+    # この配置で hook_pre_commands.py を実行すると default の
+    # git reset --hard ブロックが有効に解決される (exit 2) ことを確認する。
+    result = run_install(tmp_path, "--hooks")
+    assert result.returncode == 0, result.stderr
+
+    hook = tmp_path / ".claude" / "hooks" / "hook_pre_commands.py"
+    assert hook.exists()
+
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git reset --hard HEAD~1"}})
+    proc = subprocess.run(
+        [sys.executable, str(hook)],
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_path), "PATH": "/usr/bin:/bin"},
+    )
+    assert proc.returncode == 2, proc.stderr
+    assert "危険" in proc.stderr

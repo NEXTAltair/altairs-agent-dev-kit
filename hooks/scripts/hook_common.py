@@ -11,7 +11,20 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-DEFAULT_RULES_DIR = Path(__file__).parent.parent / "rules"
+def _default_rules_dir() -> Path:
+    """default rules ディレクトリを配置形態に応じて解決する。
+
+    repo/plugin 配置 (hooks/scripts/ → hooks/rules/) を優先し、
+    install.sh のフラット配置 (.claude/hooks/ → .claude/hooks/rules/) に
+    フォールバックする。
+    """
+    for candidate in (Path(__file__).parent.parent / "rules", Path(__file__).parent / "rules"):
+        if candidate.is_dir():
+            return candidate
+    return Path(__file__).parent.parent / "rules"
+
+
+DEFAULT_RULES_DIR = _default_rules_dir()
 
 
 def find_project_root() -> Path:
