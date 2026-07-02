@@ -39,6 +39,19 @@ git worktree add .agents/worktree/issue-123 -b fix/issue-123 origin/main
 
 > 注: kit の worktree 作成 hook (`hook_worktree_create.py`) は自動 worktree 作成を仲介する。手動 `git worktree add` も fallback として有効。
 
+### PR 保守自走の枠組み
+
+上記手順 5「PR 保守自走」は CI / bot レビュー完了まで `gh` で polling し、必要なら同じ worktree で
+修正 commit を積む。枠組みの要点: polling 間隔は数分単位、待機の合計上限は 20 分程度で打ち切って
+状況を PR にコメントする。修正ループにも上限 (目安 4 回) を設け、上限に達しても解消しない場合や
+同じファイル群でレビュー指摘が連鎖する場合は、局所修正を続けず「設計変更検討」としてエスカレーション
+する (PR へ選択肢をコメント + 設計検討 Issue を起票)。自動修正で許可するのはアプリコード・テスト・
+ドキュメント・依存更新の範囲に限り、`.github/workflows/**` の変更、権限/secret 設定変更、
+メインブランチへの直接 push、Git 履歴改変は自動修正の対象外とし、必要なら実装せずエスカレーションに
+切り替える。CI / レビューが blocking な問題を残さず、これらの禁止事項に触れていない場合のみ、
+人手を介さず squash merge してよい。詳細な判断基準・polling コマンド例・状態管理方針は
+`pr-maintainer` / `pr-autoloop` skill (導入していれば) を参照する。
+
 ## ブランチ運用
 
 このセクションは**アプリのソース (`src/`, `tests/` 等)・schema/migration を触る実装作業**に適用する。docs/tooling chore は上の「worktree + PR を要さない例外」が優先され、専用ブランチを切らずメインブランチ直 push してよい。
