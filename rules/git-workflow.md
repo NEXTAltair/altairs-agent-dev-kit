@@ -29,7 +29,7 @@ git worktree add .agents/worktree/issue-123 -b fix/issue-123 origin/main
 
 完了の定義（ユーザーが明示的に「publish 前で止めて」「draft のまま」と言わない限り）:
 1. worktree で実装
-2. CI-equivalent filter で検証（`testing.md` 参照）
+2. CI-equivalent filter で検証（[testing.md](testing.md) 参照）
 3. commit & push
 4. ready-for-review な PR を起票
 5. PR 保守自走（CI / bot レビュー）を回し、safe なら squash merge
@@ -84,6 +84,6 @@ git worktree remove .agents/worktree/fix-issue-123
 
 ## venv / 実行環境（ワークツリー内）
 
-venv / 実行環境の分離粒度 (worktree 間でどこまで共有・分離するか、package 間でどう扱うか) は `parallel-execution.md` に集約している。ワークツリー内でパッケージマネージャコマンドを実行する場合は、そちらのルールに従う (原則: 専用 venv を作らず共有実行環境を明示する)。
+venv / 実行環境の分離粒度 (worktree 間でどこまで共有・分離するか、package 間でどう扱うか) は [parallel-execution.md](parallel-execution.md) に集約している。ワークツリー内でパッケージマネージャコマンドを実行する場合は、そちらのルールに従う (原則: 専用 venv を作らず共有実行環境を明示する)。
 
-並列で複数の同期系操作を走らせる場合の詳細ルールも `parallel-execution.md` を参照。
+並列で複数の同期系操作を走らせる場合の詳細ルールも [parallel-execution.md](parallel-execution.md) を参照。

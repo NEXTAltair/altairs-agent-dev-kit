@@ -1,6 +1,6 @@
 # Parallel Execution Rules
 
-複数のパッケージマネージャ操作 (例: `uv`) を並列に走らせた際の共有仮想環境 (venv) 破損事故を再発させないための運用ルール。プロジェクトルートの venv を共有するすべての操作に適用する。venv / 実行環境の分離粒度 (worktree 間・package 間でどこまで環境を共有し、どこから分離するか) の判断はこのファイルに集約する。他のルール文書 (`git-workflow.md`, `testing.md` 等) からはこのファイルを参照するだけにとどめる。
+複数のパッケージマネージャ操作 (例: `uv`) を並列に走らせた際の共有仮想環境 (venv) 破損事故を再発させないための運用ルール。プロジェクトルートの venv を共有するすべての操作に適用する。venv / 実行環境の分離粒度 (worktree 間・package 間でどこまで環境を共有し、どこから分離するか) の判断はこのファイルに集約する。他のルール文書 ([git-workflow.md](git-workflow.md), [testing.md](testing.md) 等) からはこのファイルを参照するだけにとどめる。
 
 > **プロジェクト固有:** 実際のプロジェクトルート venv のパス、パッケージマネージャ、CI で使う env 変数名は導入先で追記する。以下は `uv` (Python) を例にした記法。
 
@@ -27,7 +27,7 @@ UV_PROJECT_ENVIRONMENT=<project root>/.venv uv run pytest
 
 ### 1. 並列で実行する場合は worktree 分離
 
-並列タスクごとに独立した worktree を切る (配置先は `.agents/worktree/` 配下、詳細は `git-workflow.md` 参照)。ただし通常は worktree ごとの venv を作らず、共有実行環境を明示する。
+並列タスクごとに独立した worktree を切る (配置先は `.agents/worktree/` 配下、詳細は [git-workflow.md](git-workflow.md) 参照)。ただし通常は worktree ごとの venv を作らず、共有実行環境を明示する。
 
 ```bash
 # 正しい: 並列ジョブごとに worktree
@@ -107,6 +107,8 @@ python --version
 - 各 package のテストはそれぞれ独立した pytest セッションとして実行するのが基本 (単一 invocation に混ぜない)
 - ただし package ごとに専用 venv を作ると、重い依存 (機械学習ライブラリ等) の重複ダウンロードや低速な I/O 環境 (ネットワークマウント等) 上での venv 作成で実用速度を損なうことがある
 - 対策: プロジェクトルートの共有 venv (dev dependency group にまとめておく) を `UV_PROJECT_ENVIRONMENT` で指し示し、package root から `--no-sync` 相当で実行することで、package 固有の venv 作成を避けられる
+
+**注意**: 常設した `UV_PROJECT_ENVIRONMENT` などの環境変数は全シェルコマンドに継承される。独立した venv を持つべきサブプロジェクト (モノレポ内の別 package 等) を実行するコマンド / recipe は、共有 venv を誤って使わないよう自前の環境変数を明示的に上書きする。さもないと静かに共有 venv へ流れて依存解決が壊れる。
 
 ```bash
 # 例: package root から共有 venv を使ってテストする

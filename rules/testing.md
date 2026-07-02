@@ -114,7 +114,7 @@ uv run pytest tests/unit/path/to/test_file.py
 
 複数の独立した package (submodule 等、それぞれ独自の pytest 設定を持つもの) がある場合、
 それぞれを独立した pytest セッションとして起動し、単一の pytest invocation に混ぜない。
-package 間の venv 共有方針は `parallel-execution.md` の「venv 分離粒度: package 間」を参照。
+package 間の venv 共有方針は [parallel-execution.md](parallel-execution.md) の「venv 分離粒度: package 間」を参照。
 
 > **プロジェクト固有:** package ごとのテスト実行コマンド (Makefile ターゲット等) をここに追記する。
 
@@ -309,7 +309,7 @@ uv run pytest -m "not downloads_and_runs_model and not calls_real_webapi"
 
 ### Worktree / I/O 制約 と package test
 
-venv / 実行環境の分離粒度 (worktree 間・package 間でどこまで環境を共有するか) は `parallel-execution.md` に集約している。低速な I/O 環境 (ネットワークマウント上の checkout 等) で package ごとに専用 venv を作ると実用速度を損なう場合があるため、そちらのルールに従い共有 venv を優先する。
+venv / 実行環境の分離粒度 (worktree 間・package 間でどこまで環境を共有するか) は [parallel-execution.md](parallel-execution.md) に集約している。低速な I/O 環境 (ネットワークマウント上の checkout 等) で package ごとに専用 venv を作ると実用速度を損なう場合があるため、そちらのルールに従い共有 venv を優先する。
 
 > **プロジェクト固有:** devcontainer / CI 環境固有のマウント構成、Makefile ターゲットの詳細をここに追記する。
 
