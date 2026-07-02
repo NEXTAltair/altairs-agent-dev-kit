@@ -47,7 +47,18 @@ if [[ "$DO_HOOKS" -eq 1 ]]; then
   chmod +x "$TARGET"/.claude/hooks/hook_*.py
   echo ""
   echo "== settings.json へ以下の hooks 配線を手動追加してください =="
-  cat "$KIT_DIR/hooks/hooks.json"
+  # install.sh はスクリプトを <target>/.claude/hooks/*.py にフラット配置するため
+  # (Claude Code プラグイン経路の ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/ とは異なる)、
+  # hooks.json テンプレートの参照を導入先の実パスへ書き換えて表示する。
+  python3 - "$KIT_DIR/hooks/hooks.json" "$TARGET" <<'PYEOF'
+import sys
+from pathlib import Path
+template, target = sys.argv[1], sys.argv[2]
+text = Path(template).read_text(encoding="utf-8")
+old = '\\"${CLAUDE_PLUGIN_ROOT}\\"/hooks/scripts/'
+new = f'\\"{target}\\"/.claude/hooks/'
+print(text.replace(old, new), end="")
+PYEOF
 fi
 
 if [[ "$DO_CODEX" -eq 1 ]]; then

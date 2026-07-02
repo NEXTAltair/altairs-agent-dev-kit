@@ -52,9 +52,12 @@ cd altairs-agent-dev-kit
 ./install.sh --target /path/to/your-repo --all --force      # 既存ファイルも上書き (--force なしは SKIP)
 ```
 
-`--hooks` はコピー後に `settings.json` へ配線すべき hook 設定 (`hooks/hooks.json` の内容) を
-標準出力に表示するのみで、`<repo>/.claude/settings.json` への自動書き込みはしない。
-表示された JSON を手動で `.claude/settings.json` の `hooks` キーへマージすること。
+`--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するのみで、
+`<repo>/.claude/settings.json` への自動書き込みはしない。表示される JSON は `hooks/hooks.json`
+(Claude Code プラグイン経路が使う `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/...` 形式) をそのまま
+出すのではなく、install.sh のフラット配置 (`<repo>/.claude/hooks/hook_*.py`、`scripts/` サブ
+ディレクトリなし) に合わせて実パスへ書き換えたものを表示する。表示された JSON を手動で
+`.claude/settings.json` の `hooks` キーへマージすること。
 
 ## 2. プロジェクト層 override の書き方
 

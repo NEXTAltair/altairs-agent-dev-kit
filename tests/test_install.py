@@ -25,6 +25,29 @@ def test_install_hooks_prints_wiring(tmp_path):
     assert "hooks" in result.stdout  # hooks.json 断片が表示される
 
 
+def test_install_hooks_wiring_uses_flat_install_paths(tmp_path):
+    # install.sh --hooks が表示する配線 JSON は、プラグイン経路の
+    # ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/... ではなく、実際にコピーされた
+    # <target>/.claude/hooks/hook_*.py の絶対パスを指していなければならない。
+    result = run_install(tmp_path, "--hooks")
+    assert result.returncode == 0, result.stderr
+    assert "CLAUDE_PLUGIN_ROOT" not in result.stdout
+    assert "/hooks/scripts/" not in result.stdout
+
+    json_start = result.stdout.index("{")
+    json_end = result.stdout.rindex("}") + 1
+    payload = json.loads(result.stdout[json_start:json_end])
+    hook_paths = [
+        "".join(h["command"].split('"')[1:])  # quoted target + unquoted /.claude/hooks/... suffix
+        for entries in payload["hooks"].values()
+        for entry in entries
+        for h in entry["hooks"]
+    ]
+    assert hook_paths
+    for path in hook_paths:
+        assert Path(path).exists(), path
+
+
 def test_existing_file_not_overwritten(tmp_path):
     rules = tmp_path / ".claude" / "rules"
     rules.mkdir(parents=True)
