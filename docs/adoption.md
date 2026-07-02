@@ -1,3 +1,9 @@
+---
+type: Guide
+title: 導入ガイド
+description: skills / rules / hooks / agents / Codex 設定を任意リポジトリへ導入する3経路と設定上書き方法
+timestamp: 2026-07-02
+---
 # 導入ガイド
 
 `altairs-agent-dev-kit` は skills / rules / hooks / agents / Codex 設定を任意のリポジトリへ導入するための
@@ -169,3 +175,9 @@ CI に組み込む場合の例 (GitHub Actions):
 
 pre-commit 相当で使う場合は PreToolUse hook から呼び出してもよい (kit 自体はこの lint を
 hook として配線していない — CI かローカルの明示実行を想定した独立 CLI)。
+
+## OKF バンドル運用について
+
+`docs/` は [Open Knowledge Format (OKF)](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+バンドル。frontmatter が唯一の SSoT で、`docs/index.md` は frontmatter から生成される派生物のため
+手編集しない。更新は `skills/okf-bundle` スキル (`okf_validate.py` / `okf_index.py`) で行う。

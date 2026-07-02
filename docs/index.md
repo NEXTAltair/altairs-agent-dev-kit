@@ -1,0 +1,6 @@
+# altairs-agent-dev-kit Docs Index
+
+* [altairs-agent-dev-kit 設計書](superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — LoRAIro の開発標準を汎用化し独立リポジトリとして配布するための設計方針
+* [altairs-agent-dev-kit Implementation Plan](superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — skills / rules / hooks / agents / Codex 設定を汎用化し3経路で導入できる kit を構築する実装計画
+* [導入ガイド](adoption.md) — skills / rules / hooks / agents / Codex 設定を任意リポジトリへ導入する3経路と設定上書き方法
+* [サードパーティ skills](third-party-skills.md) — 本 kit に同梱しないサードパーティ skill の npx skills add インストールリスト

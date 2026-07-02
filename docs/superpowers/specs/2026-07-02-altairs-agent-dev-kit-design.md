@@ -1,3 +1,9 @@
+---
+type: Design
+title: altairs-agent-dev-kit 設計書
+description: LoRAIro の開発標準を汎用化し独立リポジトリとして配布するための設計方針
+timestamp: 2026-07-02
+---
 # altairs-agent-dev-kit 設計書
 
 - 日付: 2026-07-02

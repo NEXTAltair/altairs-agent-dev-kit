@@ -1,3 +1,9 @@
+---
+type: Reference
+title: サードパーティ skills
+description: 本 kit に同梱しないサードパーティ skill の npx skills add インストールリスト
+timestamp: 2026-07-02
+---
 # サードパーティ skills
 
 本 kit にはライセンス・更新追従の観点から他リポジトリ由来の skills を同梱しない。

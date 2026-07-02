@@ -1,3 +1,9 @@
+---
+type: Plan
+title: altairs-agent-dev-kit Implementation Plan
+description: skills / rules / hooks / agents / Codex 設定を汎用化し3経路で導入できる kit を構築する実装計画
+timestamp: 2026-07-02
+---
 # altairs-agent-dev-kit Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
