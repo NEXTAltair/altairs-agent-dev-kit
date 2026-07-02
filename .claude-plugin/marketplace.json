@@ -1,0 +1,14 @@
+{
+  "name": "altairs-agent-dev-kit",
+  "owner": {
+    "name": "NEXTAltair"
+  },
+  "description": "AI エージェント開発標準 kit: skills / rules / hooks / agents を任意リポジトリへ配布する self-marketplace",
+  "plugins": [
+    {
+      "name": "altairs-agent-dev-kit",
+      "source": "./",
+      "description": "AI エージェント開発標準 kit: skills / rules / hooks / agents を任意リポジトリへ"
+    }
+  ]
+}

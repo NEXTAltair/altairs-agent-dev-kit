@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/timeout 5s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_pre_commands.py"
+          },
+          {
+            "type": "command",
+            "command": "/usr/bin/timeout 15s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_pre_pr_submodule_check.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/timeout 5s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_pre_edit_worktree.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/timeout 5s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_response_monitor.py"
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/timeout 120s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_worktree_create.py"
+          }
+        ]
+      }
+    ]
+  }
+}
