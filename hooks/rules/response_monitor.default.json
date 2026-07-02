@@ -1,0 +1,4 @@
+{
+  "description": "汎用デフォルト: NG ワードリストは空 (この gate はデフォルト無効)。NG ワードはプロジェクト文化依存のため、導入先の override (.claude/hooks/rules/response_monitor.json) で ng_words を追加して有効化する。",
+  "ng_words": []
+}

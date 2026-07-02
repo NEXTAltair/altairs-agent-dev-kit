@@ -1,0 +1,5 @@
+{
+  "description": "汎用デフォルト: submodule_globs は空 (この gate はデフォルト無効)。submodule を持つ導入先だけが override (.claude/hooks/rules/pre_pr_submodule_check.json) で submodule_globs を設定して有効化する。",
+  "submodule_globs": [],
+  "bypass_marker": "CI-EQUIV-TESTED"
+}
