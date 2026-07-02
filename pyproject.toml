@@ -1,0 +1,11 @@
+[project]
+name = "altairs-agent-dev-kit"
+version = "0.1.0"
+description = "AI エージェント開発標準 kit: skills / rules / hooks / agents"
+requires-python = ">=3.10"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
