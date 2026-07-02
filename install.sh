@@ -4,7 +4,7 @@ set -euo pipefail
 shopt -s nullglob
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET="" ; DO_RULES=0 ; DO_AGENTS=0 ; DO_HOOKS=0 ; DO_CODEX=0 ; FORCE=0
+TARGET="" ; DO_RULES=0 ; DO_AGENTS=0 ; DO_HOOKS=0 ; DO_CODEX=0 ; DO_SKILLS=0 ; FORCE=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -13,7 +13,8 @@ while [[ $# -gt 0 ]]; do
     --agents) DO_AGENTS=1; shift ;;
     --hooks) DO_HOOKS=1; shift ;;
     --codex) DO_CODEX=1; shift ;;
-    --all) DO_RULES=1; DO_AGENTS=1; DO_HOOKS=1; DO_CODEX=1; shift ;;
+    --skills) DO_SKILLS=1; shift ;;
+    --all) DO_RULES=1; DO_AGENTS=1; DO_HOOKS=1; DO_CODEX=1; DO_SKILLS=1; shift ;;
     --force) FORCE=1; shift ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
@@ -73,6 +74,17 @@ print(Path(template).read_text(encoding="utf-8").replace("{{PROJECT_ROOT}}", tar
 PYEOF
   echo "INSTALL: $dest"
   for f in "$KIT_DIR"/codex/agents/*.toml; do copy_file "$f" "$TARGET/.codex/agents/$(basename "$f")"; done
+fi
+
+if [[ "$DO_SKILLS" -eq 1 ]]; then
+  command -v npx >/dev/null 2>&1 || {
+    echo "ERROR: --skills には Node.js (npx) が必要です。https://nodejs.org からインストールするか、Node 導入後に再実行してください" >&2
+    exit 1
+  }
+  # skill の導入は skills.sh CLI (npx skills) に一本化する。npx は初回実行時に CLI を
+  # 自動取得するため事前の npm install は不要。--copy で node_modules へのシンボリック
+  # リンクではなく実ファイルを <target>/.claude/skills/ にコピーし、-y で非対話実行する。
+  (cd "$TARGET" && npx --yes skills add "$KIT_DIR" --skill '*' --agent claude-code -y --copy)
 fi
 
 echo "DONE"

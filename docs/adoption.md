@@ -11,6 +11,10 @@ timestamp: 2026-07-02
 
 ## 1. 導入経路
 
+まず経路C (`install.sh --all`) を使えばよい。経路A/B は以下のような個別ニーズがある場合の
+選択肢: 経路A は Claude Code のプラグイン機構による hook 自動配線が欲しい場合、経路B は
+skill を 1 本だけ他 kit と混在導入したい場合に向く。
+
 ### 経路A: Claude Code プラグイン (skills + agents + hooks を一括)
 
 本リポジトリは `.claude-plugin/marketplace.json` により self-marketplace 化されているため、
@@ -38,9 +42,10 @@ npx skills add github:NEXTAltair/altairs-agent-dev-kit --skill okf-bundle
 `skills/<name>/SKILL.md` が skills.sh の標準配置と一致しているため、任意の skill 名を
 `--skill` に指定できる。同梱 skill 一覧は `skills/` 配下のディレクトリ名 (13 本) を参照。
 
-### 経路C: install.sh — rules / agents / hooks / Codex 設定を repo にコピー
+### 経路C: install.sh — kit 全体を repo に導入する推奨経路
 
-Claude Code プラグイン機構を使わない環境、または Codex 環境向け。
+Claude Code プラグイン機構を使わない環境、または Codex 環境向け。`--all` を指定すれば
+skills / rules / agents / hooks / Codex 設定をこれ 1 本で導入できる。
 
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
@@ -51,12 +56,21 @@ cd altairs-agent-dev-kit
 個別フラグでの選択導入も可能 (`install.sh` の実引数):
 
 ```bash
+./install.sh --target /path/to/your-repo --skills           # skills 13本 → <repo>/.claude/skills/ (要 Node.js/npx)
 ./install.sh --target /path/to/your-repo --rules            # rules/*.md → <repo>/.claude/rules/
 ./install.sh --target /path/to/your-repo --agents           # agents/*.md → <repo>/.claude/agents/
 ./install.sh --target /path/to/your-repo --hooks            # hooks/scripts + rules/*.default.json → <repo>/.claude/hooks/
 ./install.sh --target /path/to/your-repo --codex            # .codex/config.toml + agents/*.toml
 ./install.sh --target /path/to/your-repo --all --force      # 既存ファイルも上書き (--force なしは SKIP)
 ```
+
+`--skills` は skills.sh CLI (`npx skills add`) に委譲する非対話実行で、kit checkout
+(`$KIT_DIR`) をソースに全 skill を `<repo>/.claude/skills/` へコピーする
+(`--copy` 指定、node_modules へのシンボリックリンクにはしない)。npx は初回実行時に CLI
+本体を自動取得するため事前の `npm install -g` は不要だが、**Node.js (npx コマンド) 自体は
+必須**。npx が見つからない環境では `--skills` は何もコピーせず、エラーメッセージ付きで
+exit 1 する (黙ったフォールバックはしない)。導入後に `npx skills update` を実行すれば
+skills.sh の通常運用と同じ手順で追従アップデートできる。
 
 `--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するのみで、
 `<repo>/.claude/settings.json` への自動書き込みはしない。表示される JSON は `hooks/hooks.json`

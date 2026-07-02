@@ -48,6 +48,18 @@ def test_install_hooks_wiring_uses_flat_install_paths(tmp_path):
         assert Path(path).exists(), path
 
 
+def test_install_skills_requires_npx(tmp_path, monkeypatch):
+    # --skills は skills.sh CLI (npx skills) に委譲する。npx (Node.js) が無い環境では
+    # 黙ってフォールバックせず、明確なエラーメッセージ付きで exit 1 する。
+    result = subprocess.run(
+        ["bash", str(KIT / "install.sh"), "--target", str(tmp_path), "--skills"],
+        capture_output=True, text=True, timeout=30,
+        env={"PATH": "/usr/bin:/bin"},
+    )
+    assert result.returncode == 1
+    assert "Node" in result.stderr
+
+
 def test_existing_file_not_overwritten(tmp_path):
     rules = tmp_path / ".claude" / "rules"
     rules.mkdir(parents=True)

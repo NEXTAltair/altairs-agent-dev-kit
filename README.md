@@ -23,31 +23,27 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 
 ## クイックスタート
 
-3 つの導入経路から選べる。詳細は [docs/adoption.md](docs/adoption.md) を参照。
-
-### 経路A: Claude Code プラグイン (skills + agents + hooks を一括導入)
-
-```bash
-claude plugin marketplace add NEXTAltair/altairs-agent-dev-kit
-claude plugin install altairs-agent-dev-kit@altairs-agent-dev-kit
-```
-
-### 経路B: skills.sh (skill を1本ずつ導入)
-
-```bash
-npx skills add github:NEXTAltair/altairs-agent-dev-kit --skill check-existing
-```
-
-### 経路C: install.sh (rules / agents / hooks / Codex 設定を repo にコピー)
-
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
 ./install.sh --target /path/to/your-repo --all
 ```
 
-個別導入したい場合は `--rules` / `--agents` / `--hooks` / `--codex` を単独指定できる
-(`--force` で既存ファイルを上書き)。
+| フラグ | 導入内容 |
+|---|---|
+| `--skills` | skills 13 本 → `<repo>/.claude/skills/` (skills.sh CLI 経由、**要 Node.js/npx**) |
+| `--rules` | `rules/*.md` → `<repo>/.claude/rules/` |
+| `--agents` | `agents/*.md` → `<repo>/.claude/agents/` |
+| `--hooks` | hooks スクリプト + default rules → `<repo>/.claude/hooks/` |
+| `--codex` | `.codex/config.toml` + `agents/*.toml` |
+| `--all` | 上記すべて |
+| `--force` | 既存ファイルも上書き (`--force` なしは `SKIP (exists)`) |
+
+`--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するだけなので、
+表示された JSON を `<repo>/.claude/settings.json` の `hooks` キーへ手動で貼り付けること。
+
+その他の導入経路 (Claude Code プラグイン / skills.sh 単体) は
+[docs/adoption.md](docs/adoption.md) を参照。
 
 ## 導入後の最小 override
 
