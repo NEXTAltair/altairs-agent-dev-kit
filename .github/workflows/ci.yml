@@ -1,0 +1,19 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --dev
+      - run: uv run pytest -v
+      - run: uv run python scripts/lint_skills.py --dir skills
+      - name: 汎用性 grep gate (kit 本体にプロジェクト固有文字列を残さない)
+        run: |
+          ! grep -rn "LoRAIro\|lorairo\|/workspaces/" \
+            skills/ rules/ hooks/ agents/ codex/ scripts/ install.sh
