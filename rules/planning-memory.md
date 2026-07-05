@@ -2,36 +2,27 @@
 
 計画策定時の過去知識活用ルール。Plan Mode やブレインストーミング/計画作成のワークフローに適用する。
 
+> **プロジェクト固有:** 本文中の `docs/decisions/`・`docs/plans/`・`docs/lessons-learned.md` は
+> 代表的な既定パスの例。導入先の実パス、および ADR 索引の生成手順はここに追記する。
+
 ## 必須: 計画策定前の知識確認
 
 計画を策定する際、コード調査の**前に**以下を確認すること:
 
 ### 1. 過去の設計判断確認（ADR）
 
-```bash
-ls docs/decisions/
-```
-
-- `docs/decisions/README.md` (または索引ファイル) でインデックスを確認
+- ADR ディレクトリ (例: `docs/decisions/`) の索引ファイルでインデックスを確認
 - 関連する ADR を参照する
 - 類似の設計パターン・技術選定の根拠を確認
 
 ### 2. 教訓確認
 
-```bash
-# docs/lessons-learned.md 等を参照
-```
-
-- 過去のバグパターン・教訓を記録したドキュメントを確認
+- 過去のバグパターン・教訓を記録したドキュメント (例: `docs/lessons-learned.md`) を確認
 - 特に同じドメイン（アーキテクチャ/テスト/UI/DB/外部連携）のセクションを重点的に確認
 
 ### 3. 最新の計画確認
 
-```bash
-ls -la docs/plans/
-```
-
-- `docs/plans/` の最新計画を確認（前回セッションの計画）
+- 計画置き場 (例: `docs/plans/`) の最新計画を確認（前回セッションの計画）
 - 継続する計画がある場合は参照する
 
 ## 適用条件
@@ -51,16 +42,16 @@ ls -la docs/plans/
 計画策定完了後、重要な設計判断は以下に保存すること:
 
 **ADR（設計判断）:**
-```
-docs/decisions/XXXX-title.md に新しい ADR を追加
-docs/decisions/README.md のインデックスを更新
-```
+
+- ADR ディレクトリに新しい ADR を追加する
+- **索引ファイルは手編集しない。** frontmatter を SSoT として生成物の索引を再生成する
+  ([documentation-maintenance.md](documentation-maintenance.md) の「機械で守れるものは生成物にする」参照。
+  運用パターンは `okf-bundle` skill)
+- **作成中 / Status=Proposed の ADR は [git-workflow.md](git-workflow.md) に従い worktree ブランチで隔離し、
+  Accepted/Implemented に確定するまでメインブランチへ push しない**
 
 **教訓（バグパターン）:**
-```
-docs/lessons-learned.md の該当ドメインセクションに追記
-```
+
+- 教訓ドキュメントの該当ドメインセクションに追記する
 
 保存対象: アーキテクチャ決定、技術選定の根拠、パフォーマンス考慮事項、設計パターン選択
-
-> **プロジェクト固有:** 長期記憶ストア (外部メモリサービス等) を併用する場合は、その保存手順・スクリプトをここに追記する。
