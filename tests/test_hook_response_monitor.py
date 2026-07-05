@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from conftest import stop_block_reason
+
 HOOK = Path(__file__).parent.parent / "hooks" / "scripts" / "hook_response_monitor.py"
 
 
@@ -28,8 +30,8 @@ def test_override_word_blocks(tmp_path):
         "ng_words": [{"keyword": "たぶん", "message": "推測禁止。検証せよ"}]
     }), encoding="utf-8")
     result = run_hook("たぶん動きます", tmp_path)
-    assert result.returncode == 2
-    assert "推測禁止" in result.stderr
+    reason = stop_block_reason(result)
+    assert reason and "推測禁止" in reason
 
 
 def test_override_word_not_present_allows(tmp_path):
@@ -40,6 +42,7 @@ def test_override_word_not_present_allows(tmp_path):
     }), encoding="utf-8")
     result = run_hook("確認してテストしました", tmp_path)
     assert result.returncode == 0
+    assert stop_block_reason(result) is None
 
 
 def test_quoted_mention_is_excluded(tmp_path):
@@ -64,8 +67,8 @@ def test_threshold_group_blocks_on_repetition(tmp_path):
         }]
     }), encoding="utf-8")
     result = run_hook("さらに書きます。また書きます。加えて書きます。", tmp_path)
-    assert result.returncode == 2
-    assert "接続詞の連打" in result.stderr
+    reason = stop_block_reason(result)
+    assert reason and "接続詞の連打" in reason
 
 
 def test_threshold_group_allows_below_threshold(tmp_path):

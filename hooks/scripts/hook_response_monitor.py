@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import find_project_root, get_log_dir, load_hook_rules  # noqa: E402
+from hook_common import emit_stop_block, find_project_root, get_log_dir, load_hook_rules  # noqa: E402
 
 
 def log_debug(log_dir: Path, message: str) -> None:
@@ -193,10 +193,8 @@ def main() -> None:
                 "作業を中止し、具体的な調査・検証を実施してから再回答してください。\n"
                 "推測・代替案・追加作業は禁止。指示されたことのみを正確に実行してください。"
             )
-            print(json.dumps({"decision": "block", "reason": reason}, ensure_ascii=False, indent=2))
-            print(reason, file=sys.stderr)
             log_debug(log_dir, f"VIOLATIONS: {len(violations)} detected")
-            sys.exit(2)
+            emit_stop_block(reason)
 
         log_debug(log_dir, "No violations detected, monitoring complete")
         sys.exit(0)

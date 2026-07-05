@@ -26,7 +26,6 @@
     ],
     "Stop": [
       {
-        "matcher": "*",
         "hooks": [
           {
             "type": "command",
@@ -37,7 +36,6 @@
     ],
     "WorktreeCreate": [
       {
-        "matcher": "*",
         "hooks": [
           {
             "type": "command",

@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from conftest import pretooluse_deny_reason
+
 HOOK = Path(__file__).parent.parent / "hooks" / "scripts" / "hook_pre_commands.py"
 
 
@@ -20,13 +22,14 @@ def run_hook(command: str, cwd: Path, extra_env: dict | None = None) -> subproce
 
 def test_git_reset_hard_blocked(tmp_path):
     result = run_hook("git reset --hard HEAD~1", tmp_path)
-    assert result.returncode == 2
-    assert "危険" in result.stderr
+    reason = pretooluse_deny_reason(result)
+    assert reason and "危険" in reason
 
 
 def test_normal_command_allowed(tmp_path):
     result = run_hook("ls -la", tmp_path)
     assert result.returncode == 0
+    assert pretooluse_deny_reason(result) is None
 
 
 def test_project_override_adds_block(tmp_path):
@@ -37,14 +40,14 @@ def test_project_override_adds_block(tmp_path):
             {"pattern": "^pip ", "reason": "pip 禁止", "suggestion": "uv add"}
         ]}), encoding="utf-8")
     result = run_hook("pip install requests", tmp_path)
-    assert result.returncode == 2
-    assert "pip" in result.stderr
+    reason = pretooluse_deny_reason(result)
+    assert reason and "pip" in reason
 
 
 def test_draft_pr_blocked_by_default(tmp_path):
     result = run_hook("gh pr create --draft --title x", tmp_path)
-    assert result.returncode == 2
-    assert "draft" in result.stderr
+    reason = pretooluse_deny_reason(result)
+    assert reason and "draft" in reason
 
 
 def test_draft_pr_allowed_when_disabled(tmp_path):
@@ -54,6 +57,7 @@ def test_draft_pr_allowed_when_disabled(tmp_path):
         json.dumps({"block_draft_pr": False}), encoding="utf-8")
     result = run_hook("gh pr create --draft --title x", tmp_path)
     assert result.returncode == 0
+    assert pretooluse_deny_reason(result) is None
 
 
 def test_worktree_uv_guard_blocks_bare_uv(tmp_path):
@@ -67,5 +71,5 @@ def test_worktree_uv_guard_blocks_bare_uv(tmp_path):
         "uv run pytest", worktree_dir,
         extra_env={"CLAUDE_PROJECT_DIR": str(tmp_path)},
     )
-    assert result.returncode == 2
-    assert "worktree" in result.stderr
+    reason = pretooluse_deny_reason(result)
+    assert reason and "worktree" in reason

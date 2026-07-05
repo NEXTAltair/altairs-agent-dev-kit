@@ -2,11 +2,16 @@
 """
 Claude Code Hooks - WorktreeCreate (provider hook)
 
-Agent tool の `isolation: "worktree"` 起動時に harness が呼ぶ **provider**。
-worktree を作成し、そのパスを stdout に echo して返す (契約: 失敗時は非ゼロ exit)。
+`claude --worktree <name>` およびサブエージェントの `isolation: "worktree"` 起動時に
+Claude Code が呼ぶ **provider**。worktree を作成し、そのパスを stdout に echo して返す。
 
-harness が渡す payload (tool_input.path は無い — このフックが作成する側):
-  {session_id, transcript_path, cwd, hook_event_name: "WorktreeCreate", name}
+契約 (公式 hooks リファレンス準拠): 成功 = exit 0 + stdout にパス。
+失敗 = 非ゼロ exit (この hook は exit 2 に限らず非ゼロ全てが失敗扱いで、
+セッション/サブエージェント起動が中断される。デフォルト作成へのフォールバックはない)。
+
+Claude Code が渡す payload:
+  {session_id, cwd, hook_event_name: "WorktreeCreate",
+   worktree_name, worktree_path (提案パス), source_ref}
 
 重要: ここで `uv sync` (や同等の依存インストール) は実行しない。
   共有の実行環境 (project_root/.venv 等) は main checkout から既に sync 済みで、
@@ -51,7 +56,9 @@ def main() -> None:
 
     repo = data.get("cwd") or str(find_project_root())
     worktree_base = Path(repo) / WORKTREE_SUBDIR
-    worktree_path = worktree_base / _sanitize(data.get("name") or "agent")
+    # 現行スキーマは worktree_name。旧 payload 形状 (name) にもフォールバックする。
+    worktree_path = worktree_base / _sanitize(data.get("worktree_name") or data.get("name") or "agent")
+    source_ref = data.get("source_ref") or "HEAD"
 
     try:
         worktree_base.mkdir(parents=True, exist_ok=True)
@@ -59,7 +66,7 @@ def main() -> None:
         # 既存 worktree は再利用 (セッション再開耐性)。無ければ detached で作成。
         if not (worktree_path / ".git").exists():
             result = subprocess.run(
-                ["git", "worktree", "add", "--detach", str(worktree_path), "HEAD"],
+                ["git", "worktree", "add", "--detach", str(worktree_path), source_ref],
                 cwd=repo,
                 capture_output=True,
                 text=True,

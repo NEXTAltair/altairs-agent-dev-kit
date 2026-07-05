@@ -101,7 +101,7 @@ def test_installed_hooks_flat_layout_resolves_default_rules(tmp_path):
     # install.sh --hooks はスクリプトを <target>/.claude/hooks/*.py に、
     # default rules を <target>/.claude/hooks/rules/*.default.json にフラット配置する。
     # この配置で hook_pre_commands.py を実行すると default の
-    # git reset --hard ブロックが有効に解決される (exit 2) ことを確認する。
+    # git reset --hard ブロックが有効に解決される (permissionDecision=deny) ことを確認する。
     result = run_install(tmp_path, "--hooks")
     assert result.returncode == 0, result.stderr
 
@@ -117,5 +117,7 @@ def test_installed_hooks_flat_layout_resolves_default_rules(tmp_path):
         timeout=10,
         env={"CLAUDE_PROJECT_DIR": str(tmp_path), "PATH": "/usr/bin:/bin"},
     )
-    assert proc.returncode == 2, proc.stderr
-    assert "危険" in proc.stderr
+    assert proc.returncode == 0, proc.stderr
+    output = json.loads(proc.stdout)["hookSpecificOutput"]
+    assert output["permissionDecision"] == "deny"
+    assert "危険" in output["permissionDecisionReason"]
