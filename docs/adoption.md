@@ -113,6 +113,23 @@ override の list は default の list に **連結** される (置換ではな
 - `blocked_commands` は kit デフォルトの配列に **連結** される (git 破壊系コマンドのブロックはそのまま有効)
 - `worktree_uv_guard: true` で「worktree 内の `uv` 実行は共有 venv (`UV_PROJECT_ENVIRONMENT=...`) を明示しないとブロック」が有効化される
 
+### `.claude/hooks/rules/pre_edit_worktree.json` — 保護ディレクトリの上書き
+
+編集ゲート (`hook_pre_edit_worktree.py`) は共有 checkout 直下の保護ディレクトリ
+(デフォルト: `src`, `tests`) への編集をブロックし、`.agents/worktree/` 配下での編集のみ
+許可する。保護対象は override で **連結** 追加できる:
+
+```json
+{
+  "protected_dirs": ["lib", "app"]
+}
+```
+
+一時的にゲートを回避したい場合 (レビュー済みの hotfix 等) は環境変数
+`ALLOW_MAIN_EDIT=1` を付けてツールを実行すると編集が許可される (恒常運用はしない)。
+なお worktree の配置先 `.agents/worktree/` は kit の規約として固定
+(git-workflow ルール・worktree provider・編集ゲートが同じパスを前提に連携する)。
+
 ### `.claude/hooks/rules/response_monitor.json` — NG ワード例
 
 kit デフォルトは `ng_words: []` (無効)。NG ワードはプロジェクト文化依存のため、
