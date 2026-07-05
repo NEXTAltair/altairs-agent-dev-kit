@@ -26,8 +26,8 @@ This skill activates for tasks involving:
 ### Pull Requests
 
 ```bash
-# Create PR with NOJIRA prefix (bypasses JIRA enforcement checks)
-gh pr create --title "NOJIRA: Your PR title" --body "PR description"
+# Create PR (タイトルはプロジェクトの commit/PR 規約に従う)
+gh pr create --title "feat: your PR title" --body "PR description"
 
 # List and view PRs
 gh pr list --state open
@@ -42,8 +42,8 @@ gh pr comment 123 --body "LGTM"
 📚 See `references/pr_operations.md` for comprehensive PR workflows
 
 **PR Title Convention:**
-- With JIRA ticket: `GR-1234: Descriptive title`
-- Without JIRA ticket: `NOJIRA: Descriptive title`
+- プロジェクトの規約 (Conventional Commits、チケット ID プレフィックス等) に従う
+- チケットトラッカー連携の必須プレフィックスがある場合は導入先の規約文書を参照
 
 ### Issues
 
@@ -139,7 +139,7 @@ gh pr list --template '{{range .}}{{.number}}: {{.title}}{{"\n"}}{{end}}'
 
 **Most Common Operations:**
 ```bash
-gh pr create --title "NOJIRA: Title" --body "Description"  # Create PR
+gh pr create --title "feat: title" --body "Description"      # Create PR
 gh pr list                                                  # List PRs
 gh pr view 123                                              # View PR details
 gh pr checks 123                                            # Check PR status
@@ -156,7 +156,7 @@ gh api repos/{owner}/{repo}/pulls/{pr_number}              # Direct API call
 ### references/pr_operations.md
 
 Comprehensive pull request operations including:
-- Detailed PR creation patterns (JIRA integration, body from file, targeting branches)
+- Detailed PR creation patterns (ticket-tracker integration, body from file, targeting branches)
 - Viewing and filtering strategies
 - Review workflows and approval patterns
 - PR lifecycle management

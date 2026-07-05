@@ -7,23 +7,23 @@ Comprehensive examples for GitHub pull request operations using gh CLI.
 ### Basic PR Creation
 
 ```bash
-# Create PR with NOJIRA prefix (bypasses JIRA enforcement checks)
-gh pr create --title "NOJIRA: Your PR title" --body "PR description"
+# Create PR (タイトルはプロジェクトの規約に従う)
+gh pr create --title "feat: your PR title" --body "PR description"
 
-# Create PR with JIRA ticket reference
-gh pr create --title "GR-1234: Your PR title" --body "PR description"
+# Create PR with a ticket reference (トラッカー連携規約があるプロジェクトの例)
+gh pr create --title "PROJ-1234: Your PR title" --body "PR description"
 
 # Create PR targeting specific branch
-gh pr create --title "NOJIRA: Feature" --body "Description" --base main --head feature-branch
+gh pr create --title "feat: feature" --body "Description" --base main --head feature-branch
 
 # Create PR with body from file
-gh pr create --title "NOJIRA: Feature" --body-file pr-description.md
+gh pr create --title "feat: feature" --body-file pr-description.md
 ```
 
 ### PR Title Convention
 
-- **With JIRA ticket**: `GR-1234: Descriptive title`
-- **Without JIRA ticket**: `NOJIRA: Descriptive title` (bypasses enforcement check)
+- プロジェクトの規約 (Conventional Commits、`PROJ-1234:` のようなチケット ID プレフィックス等) に従う
+- CI やボットがタイトル形式を強制するプロジェクトでは、その規約文書を先に確認する
 
 ---
 
