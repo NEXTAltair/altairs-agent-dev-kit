@@ -80,7 +80,7 @@ class Foo:
 
 ```python
 # Before
-@patch("image_annotator_lib.core.base.transformers.torch")
+@patch("your_package.core.heavy_deps.torch")
 def test_foo(mock_torch):
     ...
 
