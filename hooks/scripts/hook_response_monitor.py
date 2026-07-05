@@ -89,9 +89,20 @@ def check_ng_words(message: str, rules: dict[str, Any]) -> list[str]:
         if not keywords:
             continue
 
+        # exclude_patterns に一致する部分文字列 (ルール名の自己言及・譲歩構文等) を
+        # このルールの判定対象からのみ除去する。他ルールの判定には影響しない。
+        rule_text = check_message
+        for pattern in entry.get("exclude_patterns", []):
+            if not isinstance(pattern, str) or not pattern:
+                continue
+            try:
+                rule_text = re.sub(pattern, "", rule_text, flags=re.IGNORECASE)
+            except re.error:
+                continue  # 不正な正規表現は無視 (fail-open)
+
         if isinstance(threshold, int) and threshold > 1:
             total = sum(
-                len(re.findall(re.escape(keyword), check_message, re.IGNORECASE))
+                len(re.findall(re.escape(keyword), rule_text, re.IGNORECASE))
                 for keyword in keywords
             )
             if total >= threshold:
@@ -99,7 +110,7 @@ def check_ng_words(message: str, rules: dict[str, Any]) -> list[str]:
             continue
 
         for keyword in keywords:
-            if re.search(re.escape(keyword), check_message, re.IGNORECASE):
+            if re.search(re.escape(keyword), rule_text, re.IGNORECASE):
                 violations.append(f"🚫 キーワード「{keyword}」検出\n   → {rule_message}")
                 break
 
