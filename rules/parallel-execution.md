@@ -118,6 +118,21 @@ UV_PROJECT_ENVIRONMENT=<project root>/.venv uv run --no-sync pytest
 
 > **プロジェクト固有:** 実際の package 一覧、依存グループへの統合方針、I/O 制約のあるマウント構成 (devcontainer のネットワークマウント等) は導入先で追記する。
 
+## Windows: 長命プロセスの entry point ロックと暗黙 sync
+
+Windows は POSIX と異なり使用中ファイルを削除できない。GUI アプリ等の長命プロセスが共有 venv の
+entry point 実行ファイル (`Scripts\*.exe`) から起動していると、その exe をロックし続ける。
+この状態でパッケージマネージャの暗黙 sync (例: `uv run` の起動時 sync) が走ると、editable install の
+entry point 再生成がロック中 exe の削除失敗で中断し、**先に削除された別の entry point が消えたまま
+venv が部分破損**する (症状: `Failed to spawn: <command> / program not found`)。
+
+- **予防**: 長命プロセスが共有 venv から稼働している間は、同じ venv を使う CLI 実行に
+  `--no-sync` 相当を常用する (venv を一切書き換えないため安全)
+- **復旧**: 長命プロセスを終了してから `uv sync --dev` 相当で再同期する
+
+> **プロジェクト固有:** 対象となる長命プロセス (GUI アプリ等) の名前、`--no-sync` 運用を明記した
+> skill / ドキュメントへのポインタは導入先で追記する。
+
 ## 復旧手順
 
 ### 兆候
