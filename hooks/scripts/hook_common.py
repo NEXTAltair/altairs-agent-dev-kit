@@ -15,14 +15,17 @@ from typing import Any, NoReturn
 def _default_rules_dir() -> Path:
     """default rules ディレクトリを配置形態に応じて解決する。
 
-    repo/plugin 配置 (hooks/scripts/ → hooks/rules/) を優先し、
-    install.sh のフラット配置 (.claude/hooks/ → .claude/hooks/rules/) に
-    フォールバックする。
+    repo/plugin 配置 (hooks/scripts/ → hooks/rules/) と install.sh のフラット配置
+    (.claude/hooks/ → .claude/hooks/rules/) の両対応。ディレクトリの存在ではなく
+    「*.default.json を実際に含むか」で選ぶ — フラット配置の導入先には
+    markdown ルール置き場 .claude/rules/ (= script parent.parent/rules) が存在し得て、
+    存在チェックだけでは defaults を隠蔽してしまうため (issue #24)。
     """
-    for candidate in (Path(__file__).parent.parent / "rules", Path(__file__).parent / "rules"):
-        if candidate.is_dir():
+    candidates = (Path(__file__).parent.parent / "rules", Path(__file__).parent / "rules")
+    for candidate in candidates:
+        if candidate.is_dir() and any(candidate.glob("*.default.json")):
             return candidate
-    return Path(__file__).parent.parent / "rules"
+    return candidates[0]
 
 
 DEFAULT_RULES_DIR = _default_rules_dir()
