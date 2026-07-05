@@ -4,8 +4,6 @@ version: "1.0.0"
 description: "Before implementing a feature, hear out the requirement, then research existing libraries / tools / local packages (monorepo components) that already solve it. Use when scoping a new feature, evaluating build-vs-reuse, or asked to find existing solutions before writing code."
 metadata:
   short-description: 実装前の要件ヒアリング＋既存ライブラリ/ツール/ローカルパッケージ調査（build-vs-reuse 判断）。
-dependencies:
-  - context7-openclaw-research
 ---
 
 # Check Existing Solutions
@@ -30,7 +28,6 @@ dependencies:
 
 - `docs/decisions/` の ADR インデックス（`docs/decisions/README.md`）
 - `docs/lessons-learned.md` の関連ドメイン
-- プロジェクトの長期記憶スキルがあれば、それで類似調査履歴を検索
 
 ### Phase 2: 要件明確化ヒアリング（1問ずつ）
 
@@ -67,7 +64,7 @@ dependencies:
    - 第1段: PyPI / GitHub Topics / 標準ライブラリ（`WebSearch`）
    - 第2段: 実装例・比較記事・Stack Overflow（`WebSearch` / `WebFetch`）
    - 第3段: 最新動向・トレンド（`WebSearch`、現在年を明示）
-   - ライブラリの一次ドキュメントは [[context7-openclaw-research]] / Context7 MCP で取得
+   - ライブラリの一次ドキュメントは Context7 MCP (利用可能なら) または公式ドキュメントの `WebFetch` で取得
 3. **候補の評価**
    - `solutions` agent で複数候補を生成・比較（適合度・実装コスト・リスク）
 
@@ -97,7 +94,7 @@ dependencies:
 ```
 
 調査結論のうち再利用価値のあるもの（ライブラリ評価、build-vs-reuse の判断根拠）は
-プロジェクトの長期記憶スキルがあれば `type: reference` / `decision` で保存する。
+ADR (`docs/decisions/`) などプロジェクトの記録先へ残すことを推奨に含める。
 
 ## Next Step
 

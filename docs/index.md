@@ -5,3 +5,4 @@
 * [導入ガイド](adoption.md) — skills / rules / hooks / agents / Codex 設定を任意リポジトリへ導入する3経路と設定上書き方法
 * [サードパーティ skills](third-party-skills.md) — 本 kit に同梱しないサードパーティ skill の npx skills add インストールリスト
 * [ADR-0001: codex/agents/*.toml を agents/*.md からの生成物にする](decisions/0001-codex-agents-generated-from-md.md) — 手動コピーで drift していた codex agent 定義を md 単一ソースの生成方式に変更し、CI で drift を検出する
+* [ADR-0002: OpenClaw/clawdbot 長期記憶インフラの残骸を除去する](decisions/0002-remove-openclaw-ltm-residue.md) — 移植元の私設メモリサービスへの参照を agents/skills から全削除し、長期記憶連携の抽象フックも残さない
