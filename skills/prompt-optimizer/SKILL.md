@@ -1,6 +1,5 @@
 ---
 name: prompt-optimizer
-version: "1.0.0"
 description: Transform vague prompts into precise specifications using EARS (Easy Approach to Requirements Syntax) methodology. Use when requirements are loose, ambiguous, or need enhancement for AI-generated code, products, or documents.
 metadata:
   origin: https://mp.weixin.qq.com/s/yUVX-9FovSq7ZGChkHpuXQ

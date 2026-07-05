@@ -1,6 +1,5 @@
 ---
 name: skill-creator
-version: "1.0.0"
 description: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.
 license: Complete terms in LICENSE.txt
 ---
@@ -92,10 +91,10 @@ Files not intended to be loaded into context, but rather used within the output 
 **CRITICAL**: Skills should NOT contain version history or version numbers in SKILL.md:
 
 - **Forbidden**: Version sections (`## Version`, `## Changelog`, `## Release History`) in SKILL.md
-- **Forbidden**: Version numbers in SKILL.md body content
-- **Correct location**: Skill versions are tracked in marketplace.json under `plugins[].version`
+- **Forbidden**: Version numbers in SKILL.md body content and frontmatter (`version:` キーも置かない)
+- **Correct location**: バージョンは配布物側 (このリポジトリでは `.claude-plugin/plugin.json` の `version`) で一元管理する
 - **Rationale**: Marketplace infrastructure manages versioning; SKILL.md should be timeless content focused on functionality
-- **Example**: Instead of documenting v1.0.0 → v1.1.0 changes in SKILL.md, update the version in marketplace.json only
+- **Example**: Instead of documenting v1.0.0 → v1.1.0 changes in SKILL.md, update the plugin version only
 
 ### Progressive Disclosure Design Principle
 
@@ -356,31 +355,20 @@ The packaging script will:
 
 If validation fails, the script will report the errors and exit without creating a package. Fix any validation errors and run the packaging command again.
 
-### Step 8: Update Marketplace
+### Step 8: Update Distribution Metadata
 
-After packaging, update the marketplace registry to include the new or updated skill.
+このリポジトリの marketplace は **single-plugin 構成** (`.claude-plugin/marketplace.json` は
+plugin 一覧のみ、per-skill エントリは持たない)。skill を追加/更新したら:
 
-**For new skills**, add an entry to `.claude-plugin/marketplace.json`:
+1. **skill 数の記載を更新**: `README.md` と `docs/adoption.md` の「skills N 本」を実数に合わせる
+2. **plugin バージョンを bump**: `.claude-plugin/plugin.json` の `version` を semver で上げる
+   - Patch (0.1.x): Bug fixes, typo corrections
+   - Minor (0.x.0): New skills, new features, additional references
+   - Major (x.0.0): Breaking changes, restructured workflows
+3. **lint を通す**: `uv run python scripts/lint_skills.py --dir skills` (frontmatter スキーマ検証)
 
-```json
-{
-  "name": "skill-name",
-  "description": "Copy from SKILL.md frontmatter description",
-  "source": "./",
-  "strict": false,
-  "version": "1.0.0",
-  "category": "developer-tools",
-  "keywords": ["relevant", "keywords"],
-  "skills": ["./skill-name"]
-}
-```
-
-**For updated skills**, bump the version in `plugins[].version` following semver:
-- Patch (1.0.x): Bug fixes, typo corrections
-- Minor (1.x.0): New features, additional references
-- Major (x.0.0): Breaking changes, restructured workflows
-
-**Also update** `metadata.version` and `metadata.description` if the overall plugin collection changed significantly.
+`.claude-plugin/marketplace.json` に per-skill の `version`/`category`/`keywords`/`skills[]`
+を追加してはいけない (この kit のスキーマではない)。
 
 ### Step 9: Iterate
 

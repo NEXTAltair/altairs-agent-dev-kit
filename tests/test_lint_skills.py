@@ -52,3 +52,35 @@ def test_unique_allowed_tools_passes(tmp_path):
         "  - Grep\n  - Glob\n  - Read\n---\n本文",
         encoding="utf-8")
     assert run(tmp_path).returncode == 0
+
+
+def test_version_key_forbidden(tmp_path):
+    d = tmp_path / "ver-skill"
+    d.mkdir()
+    (d / "SKILL.md").write_text(
+        '---\nname: ver-skill\nversion: "1.0.0"\ndescription: x\n---\n本文',
+        encoding="utf-8")
+    result = run(tmp_path)
+    assert result.returncode == 1
+    assert "禁止キー" in result.stdout
+
+
+def test_unknown_key_rejected(tmp_path):
+    d = tmp_path / "odd-skill"
+    d.mkdir()
+    (d / "SKILL.md").write_text(
+        "---\nname: odd-skill\ndescription: x\ncolor: red\n---\n本文",
+        encoding="utf-8")
+    result = run(tmp_path)
+    assert result.returncode == 1
+    assert "未知のキー" in result.stdout
+
+
+def test_optional_keys_allowed(tmp_path):
+    d = tmp_path / "full-skill"
+    d.mkdir()
+    (d / "SKILL.md").write_text(
+        "---\nname: full-skill\ndescription: x\nlicense: Apache-2.0\n"
+        "metadata:\n  short-description: 短い説明\ndependencies: []\n---\n本文",
+        encoding="utf-8")
+    assert run(tmp_path).returncode == 0

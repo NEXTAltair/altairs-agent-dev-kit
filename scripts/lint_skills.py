@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
-"""skills lint: SKILL.md の frontmatter 必須フィールドとディレクトリ名一致を検証。"""
+"""skills lint: SKILL.md の frontmatter スキーマ (必須/許可/禁止キー) を検証。
+
+スキーマ (ADR: 監査 issue #9 の決定):
+- 必須: name (ディレクトリ名と一致), description
+- 任意: metadata (short-description / origin 等), allowed-tools (重複禁止), dependencies, license
+- 禁止: version (バージョンは .claude-plugin/plugin.json で一元管理), その他の未知キー
+"""
 
 import argparse
 import re
 import sys
 from pathlib import Path
+
+FORBIDDEN_KEYS = {"version", "keywords"}
+ALLOWED_KEYS = {"name", "description", "metadata", "allowed-tools", "dependencies", "license"}
 
 
 def parse_frontmatter(text: str) -> dict[str, str]:
@@ -63,6 +72,11 @@ def main() -> int:
             errors.append(f"{skill_dir.name}: name '{fm['name']}' がディレクトリ名と不一致")
         if not fm.get("description"):
             errors.append(f"{skill_dir.name}: frontmatter に description がない")
+        for key in fm:
+            if key in FORBIDDEN_KEYS:
+                errors.append(f"{skill_dir.name}: frontmatter に禁止キー '{key}' (バージョンは plugin.json で管理)")
+            elif key not in ALLOWED_KEYS:
+                errors.append(f"{skill_dir.name}: frontmatter に未知のキー '{key}' (許可: {sorted(ALLOWED_KEYS)})")
         for tool in find_duplicate_allowed_tools(text):
             errors.append(f"{skill_dir.name}: allowed-tools に '{tool}' が重複 (置換ミスの疑い)")
     for e in errors:

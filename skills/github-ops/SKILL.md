@@ -1,6 +1,5 @@
 ---
 name: github-ops
-version: "1.0.0"
 description: "GitHub operations via gh CLI and GitHub API: create/view/merge PRs, manage issues, query API endpoints, handle workflows in enterprise or public GitHub environments."
 ---
 
