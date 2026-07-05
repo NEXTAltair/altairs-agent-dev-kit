@@ -17,5 +17,5 @@ jobs:
         run: uv run python scripts/generate_codex_agents.py --check
       - name: 汎用性 grep gate (kit 本体にプロジェクト固有文字列を残さない)
         run: |
-          ! grep -rn "LoRAIro\|lorairo\|/workspaces/" \
+          ! grep -rn "LoRAIro\|lorairo\|/workspaces/\|host\.docker\.internal\|clawdbot\|18789\|HOOK_TOKEN\|ltm_search\|ltm_latest\|OpenClaw" \
             skills/ rules/ hooks/ agents/ codex/ scripts/ install.sh README.md .claude-plugin/

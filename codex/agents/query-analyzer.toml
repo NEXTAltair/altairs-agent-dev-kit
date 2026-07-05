@@ -107,26 +107,13 @@ After:
 - SQLite のインデックスは B-tree ベース、カバリングインデックスをサポート
 - `VACUUM` が必要な場合は大量削除後に提案
 
-## Memory Integration (プロジェクトに長期記憶スキルがあれば任意)
+## 既存記録の参照と報告
 
 ### 調査前
-1. `Read docs/decisions/` で現在の DB 状態を確認
-2. 過去の最適化記録を参照
+1. `Read docs/decisions/` で過去のスキーマ変更・最適化の記録を確認 (パスはプロジェクトの規約に合わせる)
+2. 過去の最適化記録を参照して重複調査を避ける
 
 ### 調査後
-1. `Write docs/decisions/` (ADR)```bash
-curl -sS -X POST http://host.docker.internal:18789/hooks/<project>-memory \
-  -H "Authorization: Bearer $HOOK_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "[Project] Query Optimization: [対象]",
-    "summary": "クエリ分析結果と最適化提案",
-    "body": "# Query Analysis Results\n\n...",
-    "type": "decision",
-    "importance": "Medium",
-    "tags": ["query-optimization", "sqlalchemy", "performance"],
-    "source": "Container"
-  }'
-```
+1. 分析結果と最適化提案を親エージェントへ報告する。ADR 等への永続化が必要な場合はその旨を報告に含め、起票は親エージェントに委ねる
 '''
 name = "query-analyzer"
