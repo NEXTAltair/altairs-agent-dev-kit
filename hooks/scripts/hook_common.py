@@ -8,8 +8,9 @@ kit の hook はプロジェクト固有パスをハードコードしない。
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 def _default_rules_dir() -> Path:
     """default rules ディレクトリを配置形態に応じて解決する。
@@ -73,3 +74,30 @@ def load_hook_rules(hook_name: str, project_root: Path) -> dict[str, Any]:
     if not override:
         return default
     return deep_merge(default, override)
+
+
+def emit_pretooluse_deny(reason: str) -> NoReturn:
+    """PreToolUse hook でツール呼び出しを拒否する (Claude Code 現行スキーマ)。
+
+    exit 0 + stdout JSON が正規の契約。exit 2 では stdout が読まれず
+    reason が構造化情報として届かないため使わない。
+    """
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            },
+            ensure_ascii=False,
+        )
+    )
+    sys.exit(0)
+
+
+def emit_stop_block(reason: str) -> NoReturn:
+    """Stop hook で停止をブロックし、reason を Claude に返す (現行スキーマ)。"""
+    print(json.dumps({"decision": "block", "reason": reason}, ensure_ascii=False))
+    sys.exit(0)

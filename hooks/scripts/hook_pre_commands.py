@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import find_project_root, get_log_dir, load_hook_rules  # noqa: E402
+from hook_common import emit_pretooluse_deny, find_project_root, get_log_dir, load_hook_rules  # noqa: E402
 
 PROJECT_ROOT: Path = Path.cwd()
 LOG_DIR: Path = get_log_dir(PROJECT_ROOT)
@@ -305,10 +305,8 @@ def check_branch_force_delete(command: str) -> str | None:
 
 
 def emit_block(reason: str) -> None:
-    """Block the tool call and emit a reason for clients that read stderr."""
-    print(json.dumps({"decision": "block", "reason": reason}, ensure_ascii=False))
-    print(reason, file=sys.stderr)
-    sys.exit(2)
+    """Deny the tool call with a structured reason (delegates to hook_common)."""
+    emit_pretooluse_deny(reason)
 
 
 def main() -> None:

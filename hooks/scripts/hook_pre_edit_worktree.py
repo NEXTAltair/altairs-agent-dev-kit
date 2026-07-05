@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import find_project_root, load_hook_rules  # noqa: E402
+from hook_common import emit_pretooluse_deny, find_project_root, load_hook_rules  # noqa: E402
 
 DEFAULT_PROTECTED_DIRS = ["src", "tests"]
 
@@ -101,10 +101,7 @@ def main() -> None:
         protected_dirs = rules.get("protected_dirs", DEFAULT_PROTECTED_DIRS)
 
         if _is_blocked(file_path, repo_root, worktree_root, protected_dirs):
-            reason = _build_message(file_path, repo_root, worktree_root)
-            print(json.dumps({"decision": "block", "reason": reason}, ensure_ascii=False))
-            print(reason, file=sys.stderr)
-            sys.exit(2)
+            emit_pretooluse_deny(_build_message(file_path, repo_root, worktree_root))
 
         sys.exit(0)
 

@@ -8,3 +8,4 @@
 * [ADR-0002: OpenClaw/clawdbot 長期記憶インフラの残骸を除去する](decisions/0002-remove-openclaw-ltm-residue.md) — 移植元の私設メモリサービスへの参照を agents/skills から全削除し、長期記憶連携の抽象フックも残さない
 * [ADR-0003: planning-memory を documentation-maintenance / git-workflow に整合させる](decisions/0003-align-planning-memory-rules.md) — ADR 索引の手編集指示を生成方式に統一し、具体パスをプロジェクト固有注記でゲートし、Proposed ADR の worktree 隔離を相互参照する
 * [ADR-0004: 移植元ドメインの実例を中立化し、キットの対象スタックを明示する](decisions/0004-generalize-domain-examples.md) — 画像アノテーション由来のスキーマ・モジュール名・パッケージ名を中立例に置換し、Python/uv (GUI 例は Qt) 前提を README で宣言する
+* [ADR-0005: hooks を Claude Code 現行スキーマに更新し WorktreeCreate は公式契約準拠で維持する](decisions/0005-hooks-current-schema.md) — PreToolUse のブロックを permissionDecision=deny + exit 0 に統一し、監査時に「存在しない」とされた WorktreeCreate は公式ドキュメントで実在を確認して維持・契約準拠化した

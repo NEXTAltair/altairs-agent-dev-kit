@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from conftest import pretooluse_deny_reason
+
 HOOK = Path(__file__).parent.parent / "hooks" / "scripts" / "hook_pre_pr_submodule_check.py"
 
 
@@ -60,8 +62,8 @@ def test_override_globs_blocks_submodule_change(tmp_path):
     _init_repo_with_submodule_change(tmp_path)
 
     result = run_hook('gh pr create --title "x" --body "y"', tmp_path)
-    assert result.returncode == 2
-    assert "local_packages/foo" in result.stderr
+    reason = pretooluse_deny_reason(result)
+    assert reason and "local_packages/foo" in reason
 
 
 def test_bypass_marker_allows_submodule_change(tmp_path):

@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from conftest import pretooluse_deny_reason
+
 EDIT_HOOK = Path(__file__).parent.parent / "hooks" / "scripts" / "hook_pre_edit_worktree.py"
 
 
@@ -18,7 +20,7 @@ def run_edit_hook(file_path: str, cwd: Path) -> subprocess.CompletedProcess:
 def test_shared_checkout_src_edit_blocked(tmp_path):
     (tmp_path / "src").mkdir()
     result = run_edit_hook(str(tmp_path / "src" / "app.py"), tmp_path)
-    assert result.returncode == 2
+    assert pretooluse_deny_reason(result) is not None
 
 
 def test_worktree_src_edit_allowed(tmp_path):
@@ -26,11 +28,13 @@ def test_worktree_src_edit_allowed(tmp_path):
     wt.mkdir(parents=True)
     result = run_edit_hook(str(wt / "app.py"), tmp_path)
     assert result.returncode == 0
+    assert pretooluse_deny_reason(result) is None
 
 
 def test_non_protected_edit_allowed(tmp_path):
     result = run_edit_hook(str(tmp_path / "docs" / "note.md"), tmp_path)
     assert result.returncode == 0
+    assert pretooluse_deny_reason(result) is None
 
 
 def test_protected_dirs_override_blocks_custom_dir(tmp_path):
@@ -41,11 +45,10 @@ def test_protected_dirs_override_blocks_custom_dir(tmp_path):
     )
     (tmp_path / "lib").mkdir()
     result = run_edit_hook(str(tmp_path / "lib" / "core.py"), tmp_path)
-    assert result.returncode == 2
+    assert pretooluse_deny_reason(result) is not None
 
-    # override 追加後は元の default "src" はブロックされない (list は連結でなく override 側)
     # merge 挙動確認: deep_merge は list を連結するため、default["src","tests"] +
     # override["lib"] = ["src","tests","lib"] となり src も引き続きブロックされる。
     (tmp_path / "src").mkdir()
     result_src = run_edit_hook(str(tmp_path / "src" / "app.py"), tmp_path)
-    assert result_src.returncode == 2
+    assert pretooluse_deny_reason(result_src) is not None
