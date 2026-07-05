@@ -49,6 +49,10 @@ def main() -> int:
     commands = list(iter_hook_commands(settings))
     wired_scripts: set[str] = set()
     for cmd in commands:
+        # プラグイン配線 ("${CLAUDE_PLUGIN_ROOT}"/... 形式) も解決できるよう、
+        # 既知の変数を root に展開してからパスを抽出する (kit 自身では plugin root == repo root)。
+        for var in ("${CLAUDE_PLUGIN_ROOT}", "$CLAUDE_PLUGIN_ROOT", "${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
+            cmd = cmd.replace(f'"{var}"', str(root)).replace(var, str(root))
         for match in re.findall(r"\S+\.py", cmd):
             script = Path(match)
             resolved = script if script.is_absolute() else root / script

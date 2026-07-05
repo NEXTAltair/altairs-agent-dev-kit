@@ -107,26 +107,11 @@ def check_ng_words(message: str, rules: dict[str, Any]) -> list[str]:
 
 
 def extract_response_content(input_data: dict[str, Any]) -> str | None:
-    """Stop hook 入力データから Claude 応答を抽出する。
+    """Stop hook 入力から直近の assistant 応答テキストを抽出する。
 
-    Stop hook が渡すフィールド名は Claude Code のバージョンにより変わり得るため、
-    複数の候補フィールドと transcript_path フォールバックを順に確認する。
+    実際の Stop イベント入力は {session_id, transcript_path, cwd, hook_event_name,
+    stop_hook_active} のみ。応答本文は transcript (JSONL) の末尾 assistant エントリから読む。
     """
-    if "response" in input_data:
-        response = input_data["response"]
-        if isinstance(response, str) and response.strip():
-            return response
-        if isinstance(response, dict):
-            for field in ("content", "text", "message", "output"):
-                content = response.get(field)
-                if isinstance(content, str) and content.strip():
-                    return content
-
-    for field in ("assistant_response", "claude_response", "output", "content", "text", "message"):
-        value = input_data.get(field)
-        if isinstance(value, str) and value.strip():
-            return value
-
     transcript_path = input_data.get("transcript_path", "")
     if transcript_path and Path(transcript_path).exists():
         try:
