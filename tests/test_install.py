@@ -121,3 +121,27 @@ def test_installed_hooks_flat_layout_resolves_default_rules(tmp_path):
     output = json.loads(proc.stdout)["hookSpecificOutput"]
     assert output["permissionDecision"] == "deny"
     assert "危険" in output["permissionDecisionReason"]
+
+
+def test_flat_layout_defaults_survive_rules_dir(tmp_path):
+    # --rules と --hooks を両方導入すると .claude/rules/ (markdown) が存在する。
+    # このディレクトリが default rules dir (.claude/hooks/rules/) を隠蔽して
+    # kit デフォルトの git 破壊系ブロックが無効化される回帰を検出する (issue #24)。
+    result = run_install(tmp_path, "--rules", "--hooks")
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / ".claude" / "rules" / "git-workflow.md").exists()
+
+    hook = tmp_path / ".claude" / "hooks" / "hook_pre_commands.py"
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git reset --hard HEAD~1"}})
+    proc = subprocess.run(
+        [sys.executable, str(hook)],
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_path), "PATH": "/usr/bin:/bin"},
+    )
+    assert proc.returncode == 0, proc.stderr
+    output = json.loads(proc.stdout)["hookSpecificOutput"]
+    assert output["permissionDecision"] == "deny"
+    assert "危険" in output["permissionDecisionReason"]
