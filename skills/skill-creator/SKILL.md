@@ -121,7 +121,7 @@ Anthropic has wrote skill authoring best practices, you SHOULD retrieve it befor
 **ALWAYS verify you're editing the source repository:**
 ```bash
 # WRONG - cache location (read-only copy)
-~/.claude/plugins/cache/daymade-skills/my-skill/1.0.0/my-skill/SKILL.md
+~/.claude/plugins/cache/<your-marketplace>/my-skill/1.0.0/my-skill/SKILL.md
 
 # RIGHT - source repository
 /path/to/your/claude-code-skills/my-skill/SKILL.md
@@ -258,7 +258,7 @@ Skip this step if:
 2. **Run automated scans** to identify potential sensitive content:
    ```bash
    # Product/project names, person names, paths
-   grep -rniE "portal|underwriting|mercury|glean|/Users/|/home/" skill-folder/
+   grep -rniE "<product-name>|<codename>|<team-name>|/Users/|/home/" skill-folder/
 
    # Chinese characters (if skill should be English-only)
    grep -rn '[一-龥]' skill-folder/
@@ -281,13 +281,12 @@ Skip this step if:
 
 | Business-Specific | Generic Replacement |
 |-------------------|---------------------|
-| "Mercury Prepared" | "the project" |
-| "Reviewer Portal" | "the application" |
-| "Oliver will handle..." | "Alice will handle..." |
-| `REVIEW_RESULT` | `ORDER` |
-| `risk_level` | `status` |
-| "ultrathink" | "deep review" |
-| "后面再说" | "defer to later" |
+| "Project Nimbus" (社内コードネーム) | "the project" |
+| "Acme Reviewer Portal" (製品名) | "the application" |
+| "Alice will handle..." (実在人名) | role-based reference ("the reviewer will handle...") |
+| `REVIEW_RESULT` (社内スキーマ名) | `ORDER` |
+| internal jargon ("ultrathink") | "deep review" |
+| 混入した他言語コメント | 本文言語へ翻訳 or 削除 |
 
 ### Step 6: Security Review
 

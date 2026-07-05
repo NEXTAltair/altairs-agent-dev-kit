@@ -36,7 +36,7 @@ python scripts/init_qa_project.py <project-name> [output-directory]
 - Master QA Prompt for autonomous execution
 - README with complete quickstart guide
 
-**For autonomous execution** (recommended): See `references/master_qa_prompt.md` - single copy-paste command for 100x speedup.
+**For autonomous execution** (recommended): See `references/master_qa_prompt.md` - single copy-paste command for a dramatic speedup (事例値: 手動比 ~100x)。
 
 ## Core Capabilities
 
@@ -83,7 +83,7 @@ Write standardized, reproducible test cases following AAA pattern (Arrange-Act-A
 2. Paste to LLM session
 3. LLM auto-executes, auto-tracks, auto-files bugs, auto-generates reports
 
-**Innovation**: 100x faster vs manual + zero human error in tracking + auto-resume capability.
+**Innovation**: 手動比で大幅に高速 (事例値 ~100x) + zero human error in tracking + auto-resume capability.
 
 ### 4. Bug Reporting
 
@@ -191,12 +191,12 @@ Enable LLM-driven autonomous QA testing with single master prompt:
 - Auto-escalate P0 bugs (stops testing, notifies stakeholders)
 
 **Benefits**:
-- 100x faster execution vs manual
+- Dramatically faster execution vs manual (事例値 ~100x)
 - Zero human error in tracking
 - Consistent bug documentation
 - Immediate progress visibility
 
-**Usage**: Copy master prompt, paste to LLM, let it run autonomously for 5 weeks.
+**Usage**: Copy master prompt, paste to LLM, let it run autonomously over the planned test period (事例では 5 週間).
 
 ## Adapting for Your Project
 
@@ -223,7 +223,7 @@ Enable LLM-driven autonomous QA testing with single master prompt:
 Access detailed guidelines from bundled references:
 
 - **`references/day1_onboarding.md`** - 5-hour onboarding guide for new QA engineers
-- **`references/master_qa_prompt.md`** - Single command for autonomous LLM execution (100x speedup)
+- **`references/master_qa_prompt.md`** - Single command for autonomous LLM execution
 - **`references/llm_prompts_library.md`** - 30+ ready-to-use prompts for specific QA tasks
 - **`references/google_testing_standards.md`** - AAA pattern, coverage thresholds, fail-fast validation
 - **`references/ground_truth_principle.md`** - Preventing doc/CSV sync issues (critical for test suite integrity)
@@ -257,7 +257,7 @@ Automation scripts for QA infrastructure:
 1. Read references/master_qa_prompt.md
 2. Copy the single master prompt (one paragraph)
 3. Paste to LLM conversation
-4. LLM executes all 342 test cases over 5 weeks
+4. LLM executes the full test-case suite over the planned period (事例: 342 cases / 5 週間)
 5. LLM updates tracking CSVs automatically
 6. LLM generates weekly reports automatically
 ```
@@ -276,7 +276,7 @@ Automation scripts for QA infrastructure:
 2. Verify BASELINE-METRICS.md complete
 3. Package tests/docs/ folder
 4. Include references/master_qa_prompt.md for autonomous execution
-5. QA team can start immediately (Day 1 onboarding → 5 weeks testing)
+5. QA team can start immediately (Day 1 onboarding → planned test period)
 ```
 
 ## Success Criteria

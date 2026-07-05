@@ -8,10 +8,10 @@ Run these grep patterns to identify potential sensitive content:
 
 ```bash
 # Business/product names (case-insensitive)
-grep -rniE "mercury|portal|underwriting|glean|[company-name]|[product-name]" skill-folder/
+grep -rniE "[company-name]|[product-name]|[codename]|[team-name]" skill-folder/
 
 # Person names (look for capitalized names)
-grep -rniE "\b(Oliver|John|Alice|Bob|建斌|小明)\b" skill-folder/
+grep -rniE "\b(<real-first-names-used-in-your-org>)\b" skill-folder/
 
 # Absolute paths and usernames
 grep -rniE "/Users/|/home/|/mnt/c/Users|OneDrive|username" skill-folder/
@@ -28,7 +28,7 @@ grep -rniE "ultrathink|internal-only|confidential" skill-folder/
 ### 1. Product and Project Names
 
 **What to find:**
-- Project codenames (e.g., "Mercury Prepared", "Project Phoenix")
+- Project codenames (e.g., "Project Nimbus", "Project Phoenix")
 - Internal product names (e.g., "Reviewer Portal", "Admin Dashboard")
 - Tool-specific names (e.g., "Glean Gemini" → just "Gemini")
 
@@ -40,7 +40,7 @@ grep -rniE "ultrathink|internal-only|confidential" skill-folder/
 ### 2. Person Names
 
 **What to find:**
-- Real employee names in examples: "Oliver will handle...", "建斌你来..."
+- Real employee names in examples ("<実在の同僚名> will handle...") → role-based reference へ
 - Team member references in action items
 - Author attributions that reveal identity
 
@@ -54,7 +54,7 @@ grep -rniE "ultrathink|internal-only|confidential" skill-folder/
 **What to find:**
 - Business-specific entities: `REVIEW_RESULT`, `RISK_MODEL`, `INSPECTION_FACTOR`
 - Domain-specific hierarchies: `Section → Area → Item → Evidence`
-- Field names revealing business logic: `risk_level`, `underwriting_status`
+- Field names revealing business logic: `risk_level`, `internal_credit_tier`
 
 **How to replace:**
 - Use generic entities: `ORDER`, `ORDER_ITEM`, `USER`, `PRODUCT`
@@ -77,7 +77,7 @@ grep -rniE "ultrathink|internal-only|confidential" skill-folder/
 
 **What to find:**
 - Internal slang: "ultrathink", "deep dive session"
-- Company-specific processes: "Mercury standup", "Portal review"
+- Company-specific processes: "<チーム名> standup", "<製品名> review"
 - Abbreviations without context: "MP", "RP", "UW"
 
 **How to replace:**
@@ -88,7 +88,7 @@ grep -rniE "ultrathink|internal-only|confidential" skill-folder/
 ### 6. Language-Specific Content
 
 **What to find:**
-- Chinese phrases in English skills: "后面再说", "MVP 先不做"
+- 本文言語と異なる言語の混入フレーズ (例: 英語スキル内の中国語コメント)
 - Mixed language examples that assume bilingual context
 - Culture-specific references
 

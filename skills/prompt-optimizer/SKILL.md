@@ -2,6 +2,8 @@
 name: prompt-optimizer
 version: "1.0.0"
 description: Transform vague prompts into precise specifications using EARS (Easy Approach to Requirements Syntax) methodology. Use when requirements are loose, ambiguous, or need enhancement for AI-generated code, products, or documents.
+metadata:
+  origin: https://mp.weixin.qq.com/s/yUVX-9FovSq7ZGChkHpuXQ
 ---
 
 # Prompt Optimizer
@@ -10,7 +12,7 @@ description: Transform vague prompts into precise specifications using EARS (Eas
 
 Optimize vague prompts into precise, actionable specifications using EARS (Easy Approach to Requirements Syntax) - a Rolls-Royce methodology for transforming natural language into structured, testable requirements.
 
-**Methodology inspired by:** This skill's approach to combining EARS with domain theory grounding was inspired by [阿星AI工作室 (A-Xing AI Studio)](https://mp.weixin.qq.com/s/yUVX-9FovSq7ZGChkHpuXQ), which demonstrated practical EARS application for prompt enhancement.
+**Methodology attribution:** EARS + domain-theory grounding の組み合わせは外部記事に着想を得たもの (出典は frontmatter `metadata.origin`)。
 
 **Four-layer enhancement process:**
 
