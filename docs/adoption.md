@@ -40,7 +40,7 @@ npx skills add github:NEXTAltair/altairs-agent-dev-kit --skill okf-bundle
 ```
 
 `skills/<name>/SKILL.md` が skills.sh の標準配置と一致しているため、任意の skill 名を
-`--skill` に指定できる。同梱 skill 一覧は `skills/` 配下のディレクトリ名 (13 本) を参照。
+`--skill` に指定できる。同梱 skill 一覧は `skills/` 配下のディレクトリ名 (14 本) を参照。
 
 ### 経路C: install.sh — kit 全体を repo に導入する推奨経路
 
@@ -56,7 +56,7 @@ cd altairs-agent-dev-kit
 個別フラグでの選択導入も可能 (`install.sh` の実引数):
 
 ```bash
-./install.sh --target /path/to/your-repo --skills           # skills 13本 → <repo>/.claude/skills/ (要 Node.js/npx)
+./install.sh --target /path/to/your-repo --skills           # skills 14本 → <repo>/.claude/skills/ (要 Node.js/npx)
 ./install.sh --target /path/to/your-repo --rules            # rules/*.md → <repo>/.claude/rules/
 ./install.sh --target /path/to/your-repo --agents           # agents/*.md → <repo>/.claude/agents/
 ./install.sh --target /path/to/your-repo --hooks            # hooks/scripts + rules/*.default.json → <repo>/.claude/hooks/
