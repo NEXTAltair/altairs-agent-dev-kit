@@ -180,5 +180,6 @@ curl -X POST http://host.docker.internal:18789/hooks/<project>-memory \
 | LTM保存 | POST /hooks/<project>-memory | 1-3s |
 | ライブラリドキュメント | WebSearch/WebFetch | 2-5s |
 | Web検索 | WebSearch | 2-5s |
-| ローカル分析 | Grep/Glob | 0.3-0.5s |'''
+| ローカル分析 | Grep/Glob | 0.3-0.5s |
+'''
 name = "solutions"

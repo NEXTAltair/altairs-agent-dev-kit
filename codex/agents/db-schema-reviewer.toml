@@ -1,5 +1,5 @@
 description = "SQLAlchemyスキーマ定義とAlembicマイグレーションの整合性・品質検査を行う専門エージェント。スキーマ変更時のレビューやマイグレーション計画の検証に特化しています。"
-developer_instructions = """
+developer_instructions = '''
 ## Repository Rules Reference
 
 Before implementation, mutation, branch, commit, push, or PR work, read the repository guidelines (`AGENTS.md`, if present) and the project's rules (`.claude/rules/git-workflow.md`). Issue/feature work must use a dedicated `.agents/worktree/` worktree, not the shared project checkout.
@@ -66,5 +66,6 @@ def downgrade() -> None:
 - マイグレーション: Alembic（`database/migrations/`）
 - スキーマ: `database/schema.py`
 - リポジトリ: `database/db_repository.py`
-- 関連 ADR があれば参照（例: Database Schema Decisions）"""
+- 関連 ADR があれば参照（例: Database Schema Decisions）
+'''
 name = "db-schema-reviewer"

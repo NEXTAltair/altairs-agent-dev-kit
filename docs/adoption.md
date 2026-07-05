@@ -72,6 +72,12 @@ cd altairs-agent-dev-kit
 exit 1 する (黙ったフォールバックはしない)。導入後に `npx skills update` を実行すれば
 skills.sh の通常運用と同じ手順で追従アップデートできる。
 
+`--codex` が配布する `codex/agents/*.toml` は `agents/*.md` からの**生成物**であり、手編集
+しない。`agents/*.md` を変更したら `uv run python scripts/generate_codex_agents.py` で再生成
+する (CI が `--check` で drift を検出する)。語彙置換はハーネス名フレーズ `Claude Code` →
+`Codex` のみで、裸の `Claude` / `Anthropic` (製品・API への言及) は置換しない。
+`library-research` は WebFetch/WebSearch 前提のため Codex 版を生成しない。
+
 `--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するのみで、
 `<repo>/.claude/settings.json` への自動書き込みはしない。表示される JSON は `hooks/hooks.json`
 (Claude Code プラグイン経路が使う `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/...` 形式) をそのまま
