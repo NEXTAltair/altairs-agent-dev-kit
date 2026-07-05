@@ -5,14 +5,8 @@ description: SQLAlchemy の効率的なクエリパターン集。N+1回避、�
 metadata:
   short-description: SQLAlchemy効率クエリ（N+1回避、バルク操作、インデックス、EXPLAIN）。
 allowed-tools:
-  # Code exploration
   - Grep
-  - Grep
-  - Grep
-  - Grep
-  # Memory
-  - Grep
-  # Fallback
+  - Glob
   - Read
   - Write
   - Edit

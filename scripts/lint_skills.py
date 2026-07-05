@@ -19,6 +19,32 @@ def parse_frontmatter(text: str) -> dict[str, str]:
     return fields
 
 
+def find_duplicate_allowed_tools(text: str) -> list[str]:
+    """frontmatter の allowed-tools リストに同一ツールが重複していたら返す。
+
+    過去に一括置換で複数の MCP ツール名が同一ツールに潰され、重複が生まれた
+    (監査 issue #4)。重複は置換ミスの兆候として lint で検出する。
+    """
+    match = re.match(r"\A---\n(.*?)\n---\n", text, re.DOTALL)
+    if not match:
+        return []
+    seen: set[str] = set()
+    dups: list[str] = []
+    in_allowed = False
+    for line in match.group(1).splitlines():
+        if not line.startswith((" ", "\t", "-")) and ":" in line:
+            in_allowed = line.partition(":")[0].strip() == "allowed-tools"
+            continue
+        if in_allowed:
+            item = line.strip()
+            if item.startswith("- "):
+                tool = item[2:].strip()
+                if tool in seen and tool not in dups:
+                    dups.append(tool)
+                seen.add(tool)
+    return dups
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", type=Path, default=Path("skills"))
@@ -29,13 +55,16 @@ def main() -> int:
         if not skill_md.exists():
             errors.append(f"{skill_dir.name}: SKILL.md がない")
             continue
-        fm = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+        text = skill_md.read_text(encoding="utf-8")
+        fm = parse_frontmatter(text)
         if not fm.get("name"):
             errors.append(f"{skill_dir.name}: frontmatter に name がない")
         elif fm["name"] != skill_dir.name:
             errors.append(f"{skill_dir.name}: name '{fm['name']}' がディレクトリ名と不一致")
         if not fm.get("description"):
             errors.append(f"{skill_dir.name}: frontmatter に description がない")
+        for tool in find_duplicate_allowed_tools(text):
+            errors.append(f"{skill_dir.name}: allowed-tools に '{tool}' が重複 (置換ミスの疑い)")
     for e in errors:
         print(f"VIOLATION: {e}")
     if not errors:
