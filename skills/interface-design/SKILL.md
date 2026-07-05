@@ -7,7 +7,7 @@ metadata:
   origin: https://github.com/Dammyjay93/interface-design
 allowed-tools:
   - Grep
-  - Grep
+  - Glob
   - Read
   - Write
   - Edit

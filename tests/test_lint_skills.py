@@ -30,3 +30,25 @@ def test_name_mismatch_fails(tmp_path):
 def test_missing_skill_md_fails(tmp_path):
     (tmp_path / "empty-skill").mkdir()
     assert run(tmp_path).returncode == 1
+
+
+def test_duplicate_allowed_tools_fails(tmp_path):
+    d = tmp_path / "dup-skill"
+    d.mkdir()
+    (d / "SKILL.md").write_text(
+        "---\nname: dup-skill\ndescription: x\nallowed-tools:\n"
+        "  - Grep\n  - Grep\n  - Read\n---\n本文",
+        encoding="utf-8")
+    result = run(tmp_path)
+    assert result.returncode == 1
+    assert "重複" in result.stdout
+
+
+def test_unique_allowed_tools_passes(tmp_path):
+    d = tmp_path / "ok-skill"
+    d.mkdir()
+    (d / "SKILL.md").write_text(
+        "---\nname: ok-skill\ndescription: x\nallowed-tools:\n"
+        "  - Grep\n  - Glob\n  - Read\n---\n本文",
+        encoding="utf-8")
+    assert run(tmp_path).returncode == 0
