@@ -1,6 +1,5 @@
 ---
 name: check-existing
-version: "1.0.0"
 description: "Before implementing a feature, hear out the requirement, then research existing libraries / tools / local packages (monorepo components) that already solve it. Use when scoping a new feature, evaluating build-vs-reuse, or asked to find existing solutions before writing code."
 metadata:
   short-description: 実装前の要件ヒアリング＋既存ライブラリ/ツール/ローカルパッケージ調査（build-vs-reuse 判断）。

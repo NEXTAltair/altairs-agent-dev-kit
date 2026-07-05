@@ -1,6 +1,5 @@
 ---
 name: interface-design
-version: "1.1.0"
 description: Interface design skill for dashboards, admin panels, apps, and tools. NOT for marketing design. Provides design intent, domain exploration, craft principles, and component-driven design-tool↔code sync. For PySide6/Qt technical implementation, use a project-specific GUI implementation skill (if available).
 metadata:
   short-description: UIデザイン原則（意図、ドメイン探索、クラフト）。技術実装はプロジェクト固有のGUI実装スキル（あれば）を参照。

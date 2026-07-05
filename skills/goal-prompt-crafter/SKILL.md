@@ -1,6 +1,5 @@
 ---
 name: goal-prompt-crafter
-version: "1.0.0"
 description: "Craft a measurable completion condition for autonomous multi-turn agent runs — e.g. Claude Code /goal — from a vague request: interview for the verification method, scope constraints, and stop limits, then emit a condition statement an output-only evaluator can check. Use when a user wants to set /goal, define done-criteria for an autonomous loop, or turn a task description into a verifiable completion condition."
 metadata:
   short-description: 曖昧な要望を測定可能な完了条件文に練り上げる (Claude Code /goal 対応、他エージェントの自律ループ停止条件にも流用可)。

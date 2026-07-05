@@ -1,6 +1,5 @@
 ---
 name: pr-maintainer
-version: "1.0.0"
 description: "Maintain an agent-created pull request after creation or after draft-to-ready transition: mark reviewable draft PRs ready, poll CI and review comments with gh, repair failures in the same worktree/session, reply in Japanese, escalate design loops, and squash merge when safe. Use after creating PRs or when asked to continue PR maintenance automation."
 metadata:
   short-description: "PR作成後のCI/レビュー監視、修正、返信、設計エスカレーション、squash mergeを共通運用する。"

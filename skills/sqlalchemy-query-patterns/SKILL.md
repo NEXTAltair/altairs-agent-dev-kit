@@ -1,6 +1,5 @@
 ---
 name: sqlalchemy-query-patterns
-version: "1.0.0"
 description: SQLAlchemy の効率的なクエリパターン集。N+1回避、サブクエリ、バルク操作、インデックス活用、EXPLAIN解析など、SQLite ベースのプロジェクトに適用できるクエリ最適化ガイド。Use when writing new queries, optimizing slow queries, or reviewing database access patterns.
 metadata:
   short-description: SQLAlchemy効率クエリ（N+1回避、バルク操作、インデックス、EXPLAIN）。

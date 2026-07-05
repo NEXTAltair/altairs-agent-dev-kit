@@ -1,6 +1,5 @@
 ---
 name: lazy-import-refactor
-version: "1.0.0"
 description: "Refactor module-level imports of heavy native dependencies (torch, tensorflow, jax) to function-internal lazy imports. Use when a library import triggers SIGSEGV or slow startup in environments where the native dep cannot fully initialize (e.g., CUDA driver absent, triton C-extension segfault, missing GPU). Predicts test-side effects from removed module attributes."
 metadata:
   short-description: "torch/tensorflow 等 heavy native dep の module-level → function-internal lazy import 化、test 副作用予測まで含む"

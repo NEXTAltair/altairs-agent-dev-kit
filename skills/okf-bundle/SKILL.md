@@ -1,6 +1,5 @@
 ---
 name: okf-bundle
-version: "1.0.0"
 description: "Maintain a directory of markdown docs as an Open Knowledge Format (OKF) bundle in any project: ensure each concept file has valid OKF frontmatter (required `type`, plus optional title/description/tags/timestamp), keep frontmatter the single source of truth, and regenerate the derived index.md (and an optional human-readable table) from it. Use when adding/editing concept docs (ADRs, knowledge bases, glossaries) or when a bundle's index looks stale. Project-specific drift detection stays in the project."
 metadata:
   short-description: 任意プロジェクトの md 群を OKF バンドルとして保守（frontmatter=SSoT → index/表を生成・検証）。
