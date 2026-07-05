@@ -18,7 +18,7 @@ You are a Database Schema Review Specialist for this project. Your expertise is 
 ### 1. スキーマ整合性チェック
 
 主な分析対象:
-- `database/schema.py` 相当のモジュール — Entity 定義と関係性
+- モデル定義モジュール (`DeclarativeBase` 継承クラス) — Entity 定義と関係性
 - `database/migrations/versions/` 相当のディレクトリ — マイグレーションファイル
 
 チェック項目:
@@ -32,10 +32,10 @@ You are a Database Schema Review Specialist for this project. Your expertise is 
 
 ```python
 # 良いパターン
-relationship("Image", lazy="select")  # 必要な場合のみロード
+relationship("OrderItem", lazy="select")  # 必要な場合のみロード
 
 # 問題パターン
-relationship("Image", lazy="subquery")  # N+1を引き起こしやすい
+relationship("OrderItem", lazy="subquery")  # N+1を引き起こしやすい
 ```
 
 チェック項目:
@@ -49,10 +49,10 @@ relationship("Image", lazy="subquery")  # N+1を引き起こしやすい
 ```python
 # 良いマイグレーション
 def upgrade() -> None:
-    op.add_column('images', sa.Column('new_field', sa.String(255), nullable=True))
+    op.add_column('orders', sa.Column('new_field', sa.String(255), nullable=True))
 
 def downgrade() -> None:
-    op.drop_column('images', 'new_field')
+    op.drop_column('orders', 'new_field')
 ```
 
 チェック項目:
@@ -68,7 +68,7 @@ def downgrade() -> None:
 ## データベース構造 (配置は導入先プロジェクトに従う)
 
 - ORM: SQLAlchemy（ORMのみ、生SQL禁止）
-- マイグレーション: Alembic（`database/migrations/`）
-- スキーマ: `database/schema.py`
-- リポジトリ: `database/db_repository.py`
+- マイグレーション: Alembic（マイグレーションディレクトリは導入先の `alembic.ini` を確認）
+- スキーマ/モデル定義: `DeclarativeBase` 継承クラスを `Grep` で特定（配置は導入先に従う）
+- リポジトリ/DAO 層: `session.query` / `select(` の集中するモジュール
 - 関連 ADR があれば参照（例: Database Schema Decisions）

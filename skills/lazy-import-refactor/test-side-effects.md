@@ -26,8 +26,8 @@ def test_foo(monkeypatch):
     monkeypatch.setitem(sys.modules, "torch", mock_torch)
 
     # 関数を呼び出すと、関数内 `import torch` が mock_torch を取得する
-    annotator = SomeAnnotator()
-    annotator.run_inference(...)
+    runner = SomeModelRunner()
+    runner.run_inference(...)
 ```
 
 ### 注意点
@@ -88,7 +88,7 @@ def test_import_does_not_eager_load_torch():
     """`import lib` 単体で torch が load されないことを fresh interpreter で確認"""
     script = textwrap.dedent("""
         import sys
-        import image_annotator_lib  # noqa: F401
+        import your_package  # noqa: F401
 
         loaded = sorted(
             m for m in sys.modules

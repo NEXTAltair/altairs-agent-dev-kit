@@ -1,6 +1,6 @@
 ---
 name: build-error-resolver
-description: pytest失敗、mypy/Ruffエラーの自動診断・修正提案を行う専門エージェント。エラーログを解析し、根本原因を特定して具体的な修正案を提示します。
+description: pytest失敗、mypy/Ruffエラーの自動診断・修正提案を行う専門エージェント。エラーログを解析し、根本原因を特定して具体的な修正案を提示します。Python プロジェクト向け (GUI 例は PySide6/Qt スタック前提)。
 color: orange
 tools: Read, Grep, Glob, Bash, SendMessage, TaskList, TaskGet, TaskUpdate, TaskCreate
 ---

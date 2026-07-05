@@ -113,20 +113,20 @@ Crafted output: Task type -> Product domain -> Signature -> Structure + Expressi
 
 **Defaults:** 3 obvious choices for this interface type - visual AND structural. You can't avoid patterns you haven't named.
 
-## Domain Example: AI 画像アノテーションツール
+## Domain Example: インシデント管理ダッシュボード
 
-For an AI image annotation tool:
+For an incident management dashboard (a representative "tools" domain — apply the same questions to your own product):
 
-**Domain:** Curator's desk, lightbox, sorting table, quality control station, archive room, specimen slides, gallery storage
+**Domain:** Air-traffic control tower, hospital triage board, fire station status wall, ship's bridge, mission control console
 
-**Color world:** Neutral grays of darkroom, amber of archive lighting, deep blacks of photo paper, soft cream of mounting boards, clinical white of inspection tables
+**Color world:** Radar-screen greens, muted night-shift grays, alert ambers reserved for genuine emergencies, the calm blue of an all-clear board
 
-**Signature:** The "curation feel" - every interaction feels like handling a valuable piece, not processing data
+**Signature:** The "calm authority feel" - severity is instantly legible at a glance, and quiet states look genuinely quiet instead of decoratively busy
 
 **Defaults to reject:**
-- Generic thumbnail grid -> Lightbox-style viewing with examination context
-- Plain tag chips -> Specimen-label aesthetic with origin/confidence
-- Standard progress bars -> Archival cataloging progress with batch context
+- Generic red/yellow/green badges -> A severity language where color is backed by shape and position
+- Endless table of alerts -> Triage lanes that make "what needs me now" structural
+- Standard toast notifications -> Status transitions logged on a visible timeline
 
 ---
 

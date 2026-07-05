@@ -7,3 +7,4 @@
 * [ADR-0001: codex/agents/*.toml を agents/*.md からの生成物にする](decisions/0001-codex-agents-generated-from-md.md) — 手動コピーで drift していた codex agent 定義を md 単一ソースの生成方式に変更し、CI で drift を検出する
 * [ADR-0002: OpenClaw/clawdbot 長期記憶インフラの残骸を除去する](decisions/0002-remove-openclaw-ltm-residue.md) — 移植元の私設メモリサービスへの参照を agents/skills から全削除し、長期記憶連携の抽象フックも残さない
 * [ADR-0003: planning-memory を documentation-maintenance / git-workflow に整合させる](decisions/0003-align-planning-memory-rules.md) — ADR 索引の手編集指示を生成方式に統一し、具体パスをプロジェクト固有注記でゲートし、Proposed ADR の worktree 隔離を相互参照する
+* [ADR-0004: 移植元ドメインの実例を中立化し、キットの対象スタックを明示する](decisions/0004-generalize-domain-examples.md) — 画像アノテーション由来のスキーマ・モジュール名・パッケージ名を中立例に置換し、Python/uv (GUI 例は Qt) 前提を README で宣言する
