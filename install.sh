@@ -84,7 +84,9 @@ if [[ "$DO_SKILLS" -eq 1 ]]; then
   # skill の導入は skills.sh CLI (npx skills) に一本化する。npx は初回実行時に CLI を
   # 自動取得するため事前の npm install は不要。--copy で node_modules へのシンボリック
   # リンクではなく実ファイルを <target>/.claude/skills/ にコピーし、-y で非対話実行する。
-  (cd "$TARGET" && npx --yes skills add "$KIT_DIR" --skill '*' --agent claude-code -y --copy)
+  # CLI はメジャーバージョンを固定する (フラグ互換が予告なく変わるのを防ぐ)。
+  # 追従が必要になったらこのピンを明示的に上げる。
+  (cd "$TARGET" && npx --yes skills@1 add "$KIT_DIR" --skill '*' --agent claude-code -y --copy)
 fi
 
 echo "DONE"

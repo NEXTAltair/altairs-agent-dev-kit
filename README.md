@@ -87,5 +87,5 @@ NG ワード例、rules の追記ポイント、`check_config_consistency.py` �
 
 - [docs/adoption.md](docs/adoption.md) — 導入手順の詳細とプロジェクト層 override の書き方
 - [docs/third-party-skills.md](docs/third-party-skills.md) — 同梱しないサードパーティ skill の推奨インストールリスト
-- [docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md](docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — 設計書 (原則・構成・決定事項の全体)
-- [docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md](docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — 実装計画 (タスク分解)
+- [docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md](docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — 設計書 (**構築時の歴史記録**。移植元パス等は当時のまま。現行仕様は adoption.md と ADR を参照)
+- [docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md](docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — 実装計画 (**構築時の歴史記録**。完了済み)

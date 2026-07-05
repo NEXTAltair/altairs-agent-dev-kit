@@ -344,8 +344,7 @@ If yes, write to `.interface-design/system.md`:
 
 ---
 
-# Commands
+# Scope Note
 
-- `/interface-design:status` - Current system state
-- `/interface-design:audit` - Check code against system
-- `/interface-design:extract` - Extract patterns from code
+この skill は設計原則の提供のみを行う。上流プラグイン由来のスラッシュコマンド
+(status/audit/extract) はこの kit には同梱していない。

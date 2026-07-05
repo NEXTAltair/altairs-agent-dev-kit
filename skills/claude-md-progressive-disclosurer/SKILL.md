@@ -255,3 +255,7 @@ This skill handles both types, but strategies differ:
 ```
 
 **Note**: For project CLAUDE.md, prefer `docs/` over hidden directories for discoverability by human team members.
+
+## Bundled Reference
+
+- `references/progressive_disclosure_principles.md` — progressive disclosure の設計原則の詳細

@@ -16,6 +16,7 @@ jobs:
       - name: codex agents drift 検出 (toml は agents/*.md からの生成物)
         run: uv run python scripts/generate_codex_agents.py --check
       - name: 汎用性 grep gate (kit 本体にプロジェクト固有文字列を残さない)
+        # docs/ は移植元の出所記録 (設計書・ADR の Context) を意図的に含むため対象外
         run: |
           ! grep -rn "LoRAIro\|lorairo\|/workspaces/\|host\.docker\.internal\|clawdbot\|18789\|HOOK_TOKEN\|ltm_search\|ltm_latest\|OpenClaw" \
-            skills/ rules/ hooks/ agents/ codex/ scripts/ install.sh README.md .claude-plugin/
+            skills/ rules/ hooks/ agents/ codex/ scripts/ tests/ install.sh README.md .claude-plugin/

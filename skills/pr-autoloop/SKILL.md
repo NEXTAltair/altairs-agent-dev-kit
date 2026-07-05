@@ -90,12 +90,11 @@ Treat maintenance as a self-paced poll loop. One loop cycle:
 The only agent-specific part is **how you wait the poll interval without blocking your runtime**. Do not
 hardcode a single mechanism here; follow your agent guide:
 
-- **Claude Code** → `CLAUDE.md` section "agent-pr-autoloop の Claude Code 実装" (ScheduleWakeup self-pacing;
-  fallback bounded `bash until` loop; never `sleep && <next>`).
-- **Codex** → `AGENTS.md` "Agent Git Workflow" (inline session polling; no ScheduleWakeup).
+- **Claude Code** → ScheduleWakeup self-pacing; fallback bounded `bash until` loop; never `sleep && <next>`.
+- **Codex** → inline session polling (no ScheduleWakeup).
 
-If your agent guide has no entry, fall back to the most conservative non-blocking poll your runtime supports
-and report which mechanism you used.
+導入先の `CLAUDE.md` / `AGENTS.md` に wait 機構のセクション (例: "pr-autoloop 実装") があれば
+それを優先する。無ければ上のデフォルトに従い、どの機構を使ったか報告する。
 
 ## Stop Conditions
 
@@ -107,4 +106,4 @@ yet" per `pr-maintainer`).
 
 - `pr-maintainer` skill — policy this skill executes.
 - The repository's PR maintenance ADR/policy doc, if one exists (for example under `docs/decisions/`).
-- `CLAUDE.md` / `AGENTS.md` — per-agent wait mechanism.
+- 導入先の `CLAUDE.md` / `AGENTS.md` — per-agent wait mechanism のプロジェクト上書き (任意)。
