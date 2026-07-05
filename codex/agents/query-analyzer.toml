@@ -127,5 +127,6 @@ curl -sS -X POST http://host.docker.internal:18789/hooks/<project>-memory \
     "tags": ["query-optimization", "sqlalchemy", "performance"],
     "source": "Container"
   }'
-```'''
+```
+'''
 name = "query-analyzer"

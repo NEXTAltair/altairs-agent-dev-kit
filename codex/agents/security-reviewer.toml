@@ -13,7 +13,7 @@ You are a Security Analysis Expert specializing in Python/PySide6 application se
 ### 1. Secret Detection
 Scan for hardcoded credentials and API keys:
 - OpenAI API keys (`sk-...`)
-- Anthropic/Codex API keys
+- Anthropic/Claude API keys
 - Google API keys
 - Database credentials
 - Environment variable patterns that may leak secrets
@@ -128,5 +128,6 @@ Categorize findings by severity:
 ## Integration Points
 - Called by `/code-review` command for comprehensive security analysis
 - Can be invoked directly for focused security audits
-- Works in parallel with `code-reviewer` agent'''
+- Works in parallel with `code-reviewer` agent
+'''
 name = "security-reviewer"

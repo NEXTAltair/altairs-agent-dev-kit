@@ -120,5 +120,6 @@ Use traditional tools for targeted operations:
 - **Memory-First**: 常に既存記憶から調査開始
 - **Semantic Priority**: セマンティック理解を優先
 - **Incremental Learning**: 調査結果を段階的に蓄積
-- **Cross-Reference**: ローカル調査 + OpenClaw LTM の相互参照活用'''
+- **Cross-Reference**: ローカル調査 + OpenClaw LTM の相互参照活用
+'''
 name = "investigation"

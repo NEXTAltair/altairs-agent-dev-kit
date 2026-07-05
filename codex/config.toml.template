@@ -4,9 +4,6 @@ sandbox_mode = "danger-full-access"
 inherit = "all"
 
 [shell_environment_policy.set]
-BASH_DEFAULT_TIMEOUT_MS = "5000000"
-# Agent Teams (SendMessage/TaskList 等) を使うエージェント定義を有効化する実験的フラグ
-CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"
 # 共有 venv の絶対パス。install.sh がプロジェクトルートの実パスに展開する
 # (.claude/rules/git-workflow.md の「venv（ワークツリー内）」節と対で運用する)。
 UV_PROJECT_ENVIRONMENT = "{{PROJECT_ROOT}}/.venv"

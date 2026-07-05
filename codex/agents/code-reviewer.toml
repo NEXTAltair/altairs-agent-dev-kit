@@ -1,5 +1,5 @@
 description = "コード品質、可読性、プロジェクト規約準拠の自動レビューを行う専門エージェント。Ruff/mypy統合、型ヒント検証、アーキテクチャパターン準拠を確認します。"
-developer_instructions = """
+developer_instructions = '''
 ## Repository Rules Reference
 
 Before implementation, mutation, branch, commit, push, or PR work, read the repository guidelines (`AGENTS.md`, if present) and the project's rules (`.claude/rules/git-workflow.md`). Issue/feature work must use a dedicated `.agents/worktree/` worktree, not the shared project checkout.
@@ -155,5 +155,6 @@ Identify code patterns:
 ## Integration Points
 - Called by `/code-review` command
 - Works in parallel with `security-reviewer` agent
-- Results feed into quality gates"""
+- Results feed into quality gates
+'''
 name = "code-reviewer"
