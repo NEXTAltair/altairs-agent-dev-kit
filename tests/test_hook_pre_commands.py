@@ -73,3 +73,60 @@ def test_worktree_uv_guard_blocks_bare_uv(tmp_path):
     )
     reason = pretooluse_deny_reason(result)
     assert reason and "worktree" in reason
+
+
+def test_uv_transform_denies_with_converted_command(tmp_path):
+    """uv_transforms override が有効な場合、素の python 実行は変換提案付きで deny される"""
+    rules_dir = tmp_path / ".claude" / "hooks" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "pre_commands.json").write_text(json.dumps({
+        "uv_transforms": [
+            {"pattern": "^python ", "transform": "s/^python /uv run python /"}
+        ]
+    }), encoding="utf-8")
+    result = run_hook("python script.py", tmp_path)
+    reason = pretooluse_deny_reason(result)
+    assert reason and "uv run python script.py" in reason
+
+
+def _init_repo(path):
+    def git(*args):
+        subprocess.run(["git", *args], cwd=path, check=True, capture_output=True)
+    git("init", "-q")
+    git("config", "user.email", "test@example.com")
+    git("config", "user.name", "Test")
+    git("checkout", "-q", "-b", "main")
+    (path / "README.md").write_text("init\n", encoding="utf-8")
+    git("add", "README.md")
+    git("commit", "-q", "-m", "init")
+    return git
+
+
+def test_branch_force_delete_allows_integrated_branch(tmp_path):
+    """base の祖先になっている (マージ済み) ブランチの -D は許可される"""
+    git = _init_repo(tmp_path)
+    git("branch", "merged-branch")  # main と同一コミット = ancestor
+    result = run_hook("git branch -D merged-branch", tmp_path)
+    assert result.returncode == 0
+    assert pretooluse_deny_reason(result) is None
+
+
+def test_branch_force_delete_blocks_unmerged_branch(tmp_path):
+    """base へ未統合の固有コミットを持つブランチの -D はブロックされる"""
+    git = _init_repo(tmp_path)
+    git("checkout", "-q", "-b", "wip-branch")
+    (tmp_path / "wip.txt").write_text("wip\n", encoding="utf-8")
+    git("add", "wip.txt")
+    git("commit", "-q", "-m", "wip")
+    git("checkout", "-q", "main")
+    result = run_hook("git branch -D wip-branch", tmp_path)
+    reason = pretooluse_deny_reason(result)
+    assert reason and "wip-branch" in reason
+
+
+def test_branch_delete_mention_in_message_not_blocked(tmp_path):
+    """commit message 内の 'git branch -D' 文字列には反応しない"""
+    _init_repo(tmp_path)
+    result = run_hook('git commit -m "docs: explain git branch -D usage"', tmp_path)
+    assert result.returncode == 0
+    assert pretooluse_deny_reason(result) is None

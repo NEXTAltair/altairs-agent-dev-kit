@@ -47,6 +47,26 @@ def test_unwired_hook_warns_but_passes(tmp_path):
     assert "orphan.py" in result.stdout  # WARNING 行
 
 
+def test_plugin_root_wiring_resolves(tmp_path):
+    """kit 自身が出荷する "${CLAUDE_PLUGIN_ROOT}"/... 形式の配線を誤検出しない"""
+    settings = {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [
+        {"type": "command",
+         "command": '/usr/bin/timeout 5s "${CLAUDE_PLUGIN_ROOT}"/.claude/hooks/guard.py'}]}]}}
+    root = make_project(tmp_path, settings, hook_files=["guard.py"])
+    result = run(root)
+    assert result.returncode == 0, result.stdout
+    assert "実在しない" not in result.stdout
+
+
+def test_plugin_root_wiring_detects_missing_script(tmp_path):
+    settings = {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [
+        {"type": "command",
+         "command": '/usr/bin/timeout 5s "${CLAUDE_PLUGIN_ROOT}"/.claude/hooks/ghost.py'}]}]}}
+    result = run(make_project(tmp_path, settings))
+    assert result.returncode == 1
+    assert "ghost.py" in result.stdout
+
+
 def test_consistent_project_passes(tmp_path):
     settings = {
         "env": {"MY_ENV": "1"},
