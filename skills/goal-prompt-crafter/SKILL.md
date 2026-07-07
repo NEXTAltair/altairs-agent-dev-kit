@@ -1,21 +1,23 @@
 ---
 name: goal-prompt-crafter
-description: "Craft a measurable completion condition for autonomous multi-turn agent runs — e.g. Claude Code /goal — from a vague request: interview for the verification method, scope constraints, and stop limits, then emit a condition statement an output-only evaluator can check. Use when a user wants to set /goal, define done-criteria for an autonomous loop, or turn a task description into a verifiable completion condition."
+description: "Use when a user wants to define done-criteria or a stop condition for an autonomous multi-turn agent run — setting a Claude Code /goal, a Definition of Done for a Codex/OpenClaw or external-orchestrator loop, or turning a vague task into a verifiable completion condition an evaluator can check."
 metadata:
-  short-description: 曖昧な要望を測定可能な完了条件文に練り上げる (Claude Code /goal 対応、他エージェントの自律ループ停止条件にも流用可)。
+  short-description: 曖昧な自律実行タスクを、測定可能な完了条件文と実行ブリーフに変換する (Claude Code /goal・他エージェントの自律ループ停止条件・DoD に流用可)。
 ---
 
 # Goal Prompt Crafter
 
-曖昧な要望を「自律実行エージェントが達成判定できる完了条件文」へ練り上げる。
-汎用コアは**完了条件設計**であり、Claude Code の `/goal` はその出力形式の一つ。
-Codex など `/goal` を持たないエージェントでも、同じ条件文を自律ループの停止条件・
-タスク完了定義 (Definition of Done) としてそのまま流用できる。
+曖昧な要望を「自律実行エージェントまたは評価器が達成判定できる、測定可能な完了条件文」へ
+練り上げる。汎用コアは**完了条件設計**。`/goal` 系コマンドを持つ環境 (Claude Code など) では
+その入力文として、持たない環境では自律ループの停止条件・Definition of Done・レビュー基準として、
+同じ条件文をそのまま流用できる。対象例: Claude Code、Codex CLI、OpenClaw、Stop hook、外部オーケストレータ。
 
 ## When to Use
 
-- ユーザーが `/goal` を設定したい、または「達成するまで自動で回してほしい」と言ったとき
-- タスク記述を検証可能な完了条件に変換したいとき
+- ユーザーが `/goal`・done criteria・Definition of Done・stop condition を作りたいとき
+- 「達成するまで自律的に回してほしい」タスクを安全に定義したいとき
+- タスク記述を、テスト・lint・build・ファイル生成・issue 消化などの二値判定できる
+  完了条件に落としたいとき
 - 自律ループ (loop / cron / Stop hook / 外部オーケストレータ) の停止条件を設計するとき
 
 ## Not for
@@ -23,17 +25,35 @@ Codex など `/goal` を持たないエージェントでも、同じ条件文�
 - 1ターンで終わる単発タスク (条件文を作るまでもない)
 - 要件仕様そのものの精緻化 (それは prompt-optimizer 等の要件系スキルの領分)
 
-## 前提知識: Claude Code /goal の仕様要点
+## Target Adapters (出力先の3類型)
 
-出力形式として `/goal` を使う場合、以下の制約が条件文の品質を決める:
+同じ完了条件文を、達成を判定する主体に応じて出し分ける。**既定は最も保守的な
+output-only evaluator を想定して条件文を組む** (それが通れば他の2類型にも通る)。
 
-- `/goal <条件文>` で設定。条件達成まで各ターン終了後に軽量評価モデル (既定 Haiku) が判定し、未達なら次ターンを自動開始する (Claude Code の /goal 対応バージョンが前提。挙動は導入時に実機で確認する)
-- 条件文は**最大 4000 字**
-- **評価器はエージェントの出力のみを観測する**。自分で shell を叩いて確かめない。
-  したがって「テストが通る」を条件にするなら、エージェントに検証コマンドを実際に
-  実行させ結果を出力させる文言を条件文に含めなければ、評価器は達成を判定できない
-- `/goal` 単体で現在の状態表示、`/goal clear` で解除、新しい条件を渡すと置換
+### 1. Output-only evaluator — 評価器がエージェント出力しか見ない
+
+Claude Code の `/goal` が代表例。評価器 (既定 Haiku 相当の軽量モデル) は
+エージェントの**出力テキストのみ**を観測し、自分で shell を叩かない。
+
+- `/goal <条件文>` で設定。条件達成まで各ターン終了後に判定し、未達なら次ターンを自動開始する
+  (Claude Code の /goal 対応版が前提。挙動は導入時に実機で確認する)
+- 条件文は**最大 4000 字**。`/goal` 単体で状態表示、`/goal clear` で解除、再指定で置換
+- **検証結果は出力に現れなければ判定できない**。「テストが通る」を条件にするなら、
+  エージェントに検証コマンドを実際に実行させ、コマンド・exit code・要約を出力させる文言を
+  条件文に必ず含める
 - 参照: https://code.claude.com/docs/en/goal.md
+
+### 2. Tool-capable evaluator / orchestrator — shell・CI・workspace を直接検査できる
+
+外部オーケストレータや、検証器自身がコマンドを実行できる自律ループ。
+検証コマンドの実行結果**そのもの**を判定対象にしてよい (出力への転記を義務付けなくてよい)。
+`/goal` 系コマンドを持つ環境ではその入力文として、持たない環境では自律ループの
+停止条件・Definition of Done・レビュー基準としてそのまま流用する。
+
+### 3. Human-reviewed loop — 人間が達成を確認する
+
+条件文はレビュー基準として使う。人間が観測できるなら output-only 制約は緩めてよいが、
+「二値判定できる測定可能性」は必ず保つ。
 
 ## Workflow
 
@@ -47,8 +67,9 @@ Codex など `/goal` を持たないエージェントでも、同じ条件文�
 2. **検証方法が具体か** — どのコマンドの exit code / 出力を見れば達成と言えるか
 3. **スコープ制約があるか** — 触ってはいけないファイル・変えてはいけない挙動
 4. **停止上限があるか** — ターン数・時間の上限 (暴走保険)
-5. **評価器から観測可能か** — 出力に現れない条件 (人間の承認、外部システムの状態) を
-   含んでいないか
+5. **評価器から観測可能か** — 既定の output-only evaluator を想定し、出力に現れない条件
+   (人間の承認、外部システムの状態) を含んでいないか。tool-capable / human-reviewed の
+   adapter (Target Adapters 参照) と分かっている場合のみ、この制約を緩めてよい
 
 ### Step 2: 不足分のヒアリング
 
@@ -81,8 +102,9 @@ Codex など `/goal` を持たないエージェントでも、同じ条件文�
 [上限: 達成できなければ <N> ターンで停止する]
 ```
 
-- 検証コマンドは**エージェント自身に実行・出力させる**文言にする
-  (評価器が出力から判定できるように)
+- output-only evaluator (既定) 向けには、検証コマンドを**エージェント自身に実行・出力させる**
+  文言にする (評価器が出力から判定できるように)。tool-capable な adapter では
+  実行結果そのものを判定できるので、この転記は必須ではない
 - 4000 字制限内に収める。長大な背景説明は条件文に入れず、実行ブリーフへ回す
 - **サブエージェント委譲は「作業のやり方」なので条件文には入れない**
   (評価器が観測するのは達成状態であって、手段ではない)
@@ -108,7 +130,10 @@ Codex など `/goal` を持たないエージェントでも、同じ条件文�
 ```
 
 - 委譲方針は削除・省略しない (欠けると素朴なシングルコンテキスト実行に退行する)
-- 対象エージェントに調査/検証系サブエージェントが無い場合のみ、その旨を明記して省く
+- 委譲先の呼称は対象に合わせる (subagent / task tool / worker agent / parallel agent /
+  reviewer agent 等)
+- これら委譲機能が対象エージェントに無い場合のみ、その旨を明記した上で「長いファイル
+  ダンプを避け、調査結果を短い要約に圧縮してからメインで次に進む」方針に差し替える
 
 ### Step 4: セルフチェック (アンチパターン照合)
 
@@ -124,11 +149,14 @@ Codex など `/goal` を持たないエージェントでも、同じ条件文�
 
 ### Step 5: 出力 (md ファイル保存 + メッセージ提示)
 
-成果物は**必ず md ファイルとして保存する** (メッセージ出力だけで終わらせない)。
-条件文とブリーフは長くなりがちで、後から `/goal` に貼り直したり別セッションで
-再利用したりするため、揮発するメッセージだけでは足りない。
+成果物は**ファイルシステムに書き込める環境では必ず md ファイルとして保存する**
+(メッセージ出力だけで終わらせない)。条件文とブリーフは長くなりがちで、後から `/goal` に
+貼り直したり別セッションで再利用したりするため、揮発するメッセージだけでは足りない。
+配布先の開発エージェント (Claude Code / Codex CLI / OpenClaw 等) はいずれも file-capable
+なので、保存を既定とする。**書き込めない環境でのみ**、同じ `# 完了条件` / `# 実行ブリーフ`
+/ `# 仮定` の構造をメッセージ内に出力し、ユーザーが自分で保存できる形にする。
 
-1. **md ファイルに保存 (必須)**:
+1. **md ファイルに保存 (書き込める環境では必須)**:
    - 保存先はユーザー指定パス。未指定なら作業ディレクトリの `goal-<slug>.md`
      (slug はゴールから生成)。scratchpad が使える環境ではそちらでもよい
    - ファイル構成: `# 完了条件` (Step 3-1 の条件文) → `# 実行ブリーフ` (Step 3-2) →
@@ -207,10 +235,12 @@ uv run pytest tests/unit を実行して全件 pass し、uv run ruff check src/
 ## 制約・注意
 
 - `/goal` の仕様 (バージョン・字数上限・評価モデル) は Claude Code 側の変更で変わりうる。
-  挙動が説明と食い違う場合は公式ドキュメント (上記 URL) を優先する
+  挙動が説明と食い違う場合は公式ドキュメント (Target Adapters の URL) を優先する。
+  4000 字・output-only といった制約は output-only evaluator adapter 固有のもので、
+  tool-capable / human-reviewed の adapter には当てはまらない
 - 条件文は達成判定のためのもの。作業手順・背景・設計指示・サブエージェント委譲方針は
   実行ブリーフ側に置き、条件文に混ぜない
-- 成果物 (完了条件 + 実行ブリーフ) は必ず md 保存し、パスを報告する。メッセージ出力だけで
-  終わらせない
+- 成果物 (完了条件 + 実行ブリーフ) は書き込める環境では必ず md 保存し、パスを報告する。
+  書き込めない環境ではメッセージ内に同じ構造で出力する
 - 破壊的操作 (push / deploy / 削除) を含むゴールでは、不変制約に安全境界
   (「main に push しない」等) を必ず入れる
