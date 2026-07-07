@@ -82,18 +82,35 @@ if [[ "$DO_SKILLS" -eq 1 ]]; then
     exit 1
   }
   # skill の導入は skills.sh CLI (npx skills) に一本化する。npx は初回実行時に CLI を
-  # 自動取得するため事前の npm install は不要。skills.sh の2モード (公式 README):
-  #   Symlink(既定) = canonical コピーを1つ作り各 agent をそこへ symlink する
-  #   Copy(--copy)  = 各 agent に独立コピーを作る (symlink 非対応環境向け)
-  # どちらも source はコピーされる (ローカル source でも実体を作る。source へ live link する
-  # モードは存在しない)。--agent claude-code 単独指定なので symlink する相手 agent が無く、
-  # このコマンドでは --copy は実質 no-op。実体は <target>/.claude/skills/ に入る。-y で非対話。
-  # 注意: これは .claude/skills に実体を置く単一 agent レイアウト。Codex/Copilot/OpenCode が
-  # 共有する .agents/skills を canonical とし .claude/skills を symlink 化する構成
-  # (validate_harness 系が期待するレイアウト) とは別物である。
-  # CLI はメジャーバージョンを固定する (フラグ互換が予告なく変わるのを防ぐ)。
-  # 追従が必要になったらこのピンを明示的に上げる。
-  (cd "$TARGET" && npx --yes skills@1 add "$KIT_DIR" --skill '*' --agent claude-code -y --copy)
+  # 自動取得するため事前の npm install は不要。CLI はメジャーバージョンを固定する
+  # (フラグ互換が予告なく変わるのを防ぐ)。追従が必要になったらこのピンを明示的に上げる。
+  #
+  # canonical レイアウトを生成する: 実体は .agents/skills/ に置き (Codex/Copilot/OpenCode が
+  # 共有する canonical dir。--agent codex で universal 配置)、各 skill の .claude/skills/<name>
+  # はそこへの相対 symlink にする (Claude Code は .claude/skills を読む)。これは skills.sh 既定
+  # (canonical コピー + 各 agent の symlink) と、.claude/skills/<name> が symlink であることを
+  # 要求する検証 (validate_harness 等) の期待に一致する。source はコピーされ実体になる
+  # (ローカル source でも同じ。source へ live link するモードは skills.sh に存在しない)。
+  (cd "$TARGET" && npx --yes skills@1 add "$KIT_DIR" --skill '*' --agent codex -y)
+
+  # .claude/skills/<name> → ../../.agents/skills/<name> の相対 symlink を張る。
+  # skills.sh は --agent codex では .claude 側を作らないため、ここで明示生成する。
+  # symlink 非対応環境 (Windows で開発者モード無効など) では実体コピーにフォールバックする。
+  if [[ -d "$TARGET/.agents/skills" ]]; then
+    mkdir -p "$TARGET/.claude/skills"
+    for skill_dir in "$TARGET"/.agents/skills/*/; do
+      [[ -f "${skill_dir}SKILL.md" ]] || continue
+      name="$(basename "$skill_dir")"
+      link="$TARGET/.claude/skills/$name"
+      [[ -e "$link" || -L "$link" ]] && rm -rf "$link"
+      if ln -s "../../.agents/skills/$name" "$link" 2>/dev/null; then
+        echo "LINK: .claude/skills/$name -> ../../.agents/skills/$name"
+      else
+        cp -r "${skill_dir%/}" "$link"
+        echo "COPY (symlink 非対応環境): .claude/skills/$name"
+      fi
+    done
+  fi
 fi
 
 echo "DONE"

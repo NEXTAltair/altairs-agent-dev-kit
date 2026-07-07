@@ -1,6 +1,6 @@
 ---
 name: goal-prompt-crafter
-description: "Use when a user wants to define done-criteria or a stop condition for an autonomous multi-turn agent run — setting a Claude Code /goal, a Definition of Done for a Codex/OpenClaw or external-orchestrator loop, or turning a vague task into a verifiable completion condition an evaluator can check."
+description: "Use when a user wants to define done-criteria or a stop condition for an autonomous multi-turn agent run — setting a Claude Code /goal, a Definition of Done for a Codex or external-orchestrator loop, or turning a vague task into a verifiable completion condition an evaluator can check."
 metadata:
   short-description: 曖昧な自律実行タスクを、測定可能な完了条件文と実行ブリーフに変換する (Claude Code /goal・他エージェントの自律ループ停止条件・DoD に流用可)。
 ---
@@ -10,7 +10,7 @@ metadata:
 曖昧な要望を「自律実行エージェントまたは評価器が達成判定できる、測定可能な完了条件文」へ
 練り上げる。汎用コアは**完了条件設計**。`/goal` 系コマンドを持つ環境 (Claude Code など) では
 その入力文として、持たない環境では自律ループの停止条件・Definition of Done・レビュー基準として、
-同じ条件文をそのまま流用できる。対象例: Claude Code、Codex CLI、OpenClaw、Stop hook、外部オーケストレータ。
+同じ条件文をそのまま流用できる。対象例: Claude Code、Codex CLI、Stop hook、外部オーケストレータ。
 
 ## When to Use
 
@@ -152,7 +152,7 @@ Claude Code の `/goal` が代表例。評価器 (既定 Haiku 相当の軽量�
 成果物は**ファイルシステムに書き込める環境では必ず md ファイルとして保存する**
 (メッセージ出力だけで終わらせない)。条件文とブリーフは長くなりがちで、後から `/goal` に
 貼り直したり別セッションで再利用したりするため、揮発するメッセージだけでは足りない。
-配布先の開発エージェント (Claude Code / Codex CLI / OpenClaw 等) はいずれも file-capable
+配布先の開発エージェント (Claude Code / Codex CLI 等) はいずれも file-capable
 なので、保存を既定とする。**書き込めない環境でのみ**、同じ `# 完了条件` / `# 実行ブリーフ`
 / `# 仮定` の構造をメッセージ内に出力し、ユーザーが自分で保存できる形にする。
 

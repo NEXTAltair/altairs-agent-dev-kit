@@ -1,7 +1,10 @@
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 KIT = Path(__file__).parent.parent
 
@@ -58,6 +61,31 @@ def test_install_skills_requires_npx(tmp_path, monkeypatch):
     )
     assert result.returncode == 1
     assert "Node" in result.stderr
+
+
+@pytest.mark.skipif(shutil.which("npx") is None, reason="skills.sh CLI (npx/Node.js) が必要")
+def test_install_skills_canonical_layout(tmp_path):
+    # install.sh --skills は canonical レイアウトを生成する:
+    #   .agents/skills/<name>  = 実体 (Codex/Copilot/OpenCode 共有 canonical dir)
+    #   .claude/skills/<name>  = ../../.agents/skills/<name> への symlink (Claude Code 用)
+    # これは validate_harness 等が期待する構成 (.claude/skills は symlink) と一致する。
+    result = subprocess.run(
+        ["bash", str(KIT / "install.sh"), "--target", str(tmp_path), "--skills"],
+        capture_output=True, text=True, timeout=180,
+    )
+    assert result.returncode == 0, result.stderr
+
+    agents_skills = tmp_path / ".agents" / "skills"
+    claude_skills = tmp_path / ".claude" / "skills"
+    real_skills = [d for d in agents_skills.iterdir() if (d / "SKILL.md").exists()]
+    assert real_skills, "no skills installed under .agents/skills"
+
+    for skill_dir in real_skills:
+        assert not skill_dir.is_symlink(), f"{skill_dir} は実体であるべき"
+        link = claude_skills / skill_dir.name
+        assert link.is_symlink(), f"{link} は symlink であるべき"
+        assert link.resolve() == skill_dir.resolve(), f"{link} は {skill_dir} を指すべき"
+        assert (link / "SKILL.md").exists(), "symlink 越しに SKILL.md が解決するべき"
 
 
 def test_existing_file_not_overwritten(tmp_path):

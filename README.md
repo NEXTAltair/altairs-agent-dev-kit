@@ -35,7 +35,7 @@ cd altairs-agent-dev-kit
 
 | フラグ | 導入内容 |
 |---|---|
-| `--skills` | skills 15 本 → `<repo>/.claude/skills/` (skills.sh CLI 経由、**要 Node.js/npx**) |
+| `--skills` | skills 15 本 → `<repo>/.agents/skills/` (実体) + `<repo>/.claude/skills/` (symlink)。skills.sh CLI 経由、**要 Node.js/npx** |
 | `--rules` | `rules/*.md` → `<repo>/.claude/rules/` |
 | `--agents` | `agents/*.md` → `<repo>/.claude/agents/` |
 | `--hooks` | hooks スクリプト + default rules → `<repo>/.claude/hooks/` |
@@ -86,6 +86,7 @@ NG ワード例、rules の追記ポイント、`check_config_consistency.py` �
 ## ドキュメント
 
 - [docs/adoption.md](docs/adoption.md) — 導入手順の詳細とプロジェクト層 override の書き方
+- [docs/skill-install-runbook.md](docs/skill-install-runbook.md) — skill 導入/更新の runbook (canonical レイアウト・sourceType・github@ref bump・footgun 対策)
 - [docs/third-party-skills.md](docs/third-party-skills.md) — 同梱しないサードパーティ skill の推奨インストールリスト
 - [docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md](docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — 設計書 (**構築時の歴史記録**。移植元パス等は当時のまま。現行仕様は adoption.md と ADR を参照)
 - [docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md](docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — 実装計画 (**構築時の歴史記録**。完了済み)
