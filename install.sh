@@ -82,8 +82,15 @@ if [[ "$DO_SKILLS" -eq 1 ]]; then
     exit 1
   }
   # skill の導入は skills.sh CLI (npx skills) に一本化する。npx は初回実行時に CLI を
-  # 自動取得するため事前の npm install は不要。--copy で node_modules へのシンボリック
-  # リンクではなく実ファイルを <target>/.claude/skills/ にコピーし、-y で非対話実行する。
+  # 自動取得するため事前の npm install は不要。skills.sh の2モード (公式 README):
+  #   Symlink(既定) = canonical コピーを1つ作り各 agent をそこへ symlink する
+  #   Copy(--copy)  = 各 agent に独立コピーを作る (symlink 非対応環境向け)
+  # どちらも source はコピーされる (ローカル source でも実体を作る。source へ live link する
+  # モードは存在しない)。--agent claude-code 単独指定なので symlink する相手 agent が無く、
+  # このコマンドでは --copy は実質 no-op。実体は <target>/.claude/skills/ に入る。-y で非対話。
+  # 注意: これは .claude/skills に実体を置く単一 agent レイアウト。Codex/Copilot/OpenCode が
+  # 共有する .agents/skills を canonical とし .claude/skills を symlink 化する構成
+  # (validate_harness 系が期待するレイアウト) とは別物である。
   # CLI はメジャーバージョンを固定する (フラグ互換が予告なく変わるのを防ぐ)。
   # 追従が必要になったらこのピンを明示的に上げる。
   (cd "$TARGET" && npx --yes skills@1 add "$KIT_DIR" --skill '*' --agent claude-code -y --copy)
