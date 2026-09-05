@@ -41,7 +41,7 @@ def test_install_hooks_wiring_uses_flat_install_paths(tmp_path):
     json_end = result.stdout.rindex("}") + 1
     payload = json.loads(result.stdout[json_start:json_end])
     hook_paths = [
-        "".join(h["command"].split('"')[1:])  # quoted target + unquoted /.claude/hooks/... suffix
+        h["args"][-1].replace("${CLAUDE_PROJECT_DIR}", str(tmp_path))
         for entries in payload["hooks"].values()
         for entry in entries
         for h in entry["hooks"]
