@@ -4,8 +4,10 @@ Common hook policy belongs to this kit. Consuming repositories keep their own
 override JSON and event registrations, not independent copies maintained by hand.
 
 The plugin template uses Claude exec-form commands (`python`, `args`) and native
-timeout fields. The installer renders the plugin root placeholder into the project
-root placeholder. Explicit UTF-8 handles non-ASCII repository names on Windows.
+timeout fields. Installed project registrations resolve the active Git root and
+fall back to the main checkout's runtime when a new linked worktree has no installed
+hooks. Policy overrides still come from the active checkout. Explicit UTF-8 handles
+non-ASCII repository names on Windows.
 
 Codex adapters select the provider and reuse shared policy. The current PreToolUse
 contract accepts structured `hookSpecificOutput.permissionDecision=deny` with exit

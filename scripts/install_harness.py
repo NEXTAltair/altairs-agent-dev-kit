@@ -32,25 +32,30 @@ def claude_wiring() -> dict:
     for groups in config["hooks"].values():
         for group in groups:
             for hook in group["hooks"]:
-                hook["args"] = [
-                    arg.replace(
-                        "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/", "${CLAUDE_PROJECT_DIR}/.claude/hooks/"
-                    )
-                    for arg in hook["args"]
-                ]
+                script = hook["args"][-1].rsplit("/", 1)[-1]
+                hook["args"] = ["-X", "utf8", "-c", hook_bootstrap(f".claude/hooks/{script}")]
     return config
+
+
+def hook_bootstrap(relative: str) -> str:
+    """Use the active checkout's rules even when runtime is installed only in main."""
+    return (
+        "import os,pathlib,runpy,subprocess,sys; "
+        "r=pathlib.Path(subprocess.check_output(['git','rev-parse','--show-toplevel'],"
+        "text=True,encoding='utf-8').strip()); "
+        "os.environ['AGENT_KIT_PROJECT_DIR']=str(r); "
+        f"p=r/'{relative}'; "
+        "p=p if p.is_file() else pathlib.Path(subprocess.check_output("
+        "['git','rev-parse','--path-format=absolute','--git-common-dir'],"
+        f"text=True,encoding='utf-8').strip()).parent/'{relative}'; "
+        "sys.path.insert(0,str(p.parent)); runpy.run_path(str(p),run_name='__main__')"
+    )
 
 
 def codex_wiring() -> dict:
     events = {}
     for event, script in (("PreToolUse", "hook_pre_commands"), ("Stop", "hook_response_monitor")):
-        bootstrap = (
-            "import pathlib,runpy,subprocess,sys; "
-            "p=pathlib.Path(subprocess.check_output(['git','rev-parse','--show-toplevel'],"
-            "text=True,encoding='utf-8').strip())/"
-            f"'.codex/hooks/{script}.py'; sys.path.insert(0,str(p.parent)); "
-            "runpy.run_path(str(p),run_name='__main__')"
-        )
+        bootstrap = hook_bootstrap(f".codex/hooks/{script}.py")
         group = {
             "hooks": [
                 {

@@ -25,9 +25,38 @@ def test_installed_launchers_and_overrides(tmp_path):
     assert target.as_posix() in (target / ".codex/config.toml").read_text(encoding="utf-8")
     nested = target / "nested"
     nested.mkdir()
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(target),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "init",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    worktree = target / ".agents/worktree/fresh"
+    subprocess.run(
+        ["git", "-C", str(target), "worktree", "add", "--detach", str(worktree)],
+        check=True,
+        capture_output=True,
+    )
+    assert not (worktree / ".claude/hooks/hook_common.py").exists()
+    worktree_rules = worktree / ".claude/hooks/rules/pre_commands.json"
+    worktree_rules.parent.mkdir(parents=True)
+    worktree_rules.write_text(rules.read_text(encoding="utf-8"), encoding="utf-8")
     codex = json.loads((target / ".codex/hooks.json").read_text(encoding="utf-8"))
     assert "WorktreeCreate" not in codex["hooks"]
-    for provider, config in (("claude", wiring), ("codex", codex)):
+    for provider, config, cwd in (
+        (p, c, d) for p, c in (("claude", wiring), ("codex", codex)) for d in (nested, worktree)
+    ):
         for event in ("PreToolUse", "Stop"):
             handler = config["hooks"][event][0]["hooks"][0]
             if provider == "claude":
@@ -40,7 +69,7 @@ def test_installed_launchers_and_overrides(tmp_path):
             else:
                 command = ["sh", "-c", handler["command"]]
             payload = {
-                "cwd": str(nested),
+                "cwd": str(cwd),
                 "hook_event_name": event,
                 "tool_name": "Bash",
                 "tool_input": {"command": "forbidden"},
@@ -50,7 +79,7 @@ def test_installed_launchers_and_overrides(tmp_path):
             result = subprocess.run(
                 command,
                 input=json.dumps(payload),
-                cwd=nested,
+                cwd=cwd,
                 env=dict(os.environ, CLAUDE_PROJECT_DIR=str(target)),
                 text=True,
                 encoding="utf-8",

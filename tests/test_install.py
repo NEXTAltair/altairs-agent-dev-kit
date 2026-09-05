@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -41,7 +42,7 @@ def test_install_hooks_wiring_uses_flat_install_paths(tmp_path):
     json_end = result.stdout.rindex("}") + 1
     payload = json.loads(result.stdout[json_start:json_end])
     hook_paths = [
-        h["args"][-1].replace("${CLAUDE_PROJECT_DIR}", str(tmp_path))
+        tmp_path / re.search(r"\.claude/hooks/[\w_]+\.py", h["args"][-1]).group()
         for entries in payload["hooks"].values()
         for entry in entries
         for h in entry["hooks"]
