@@ -112,10 +112,14 @@ def test_install_skills_canonical_layout(tmp_path):
     lock["skills"]["check-existing"].update(sourceType="github", source="owner/pinned", ref="v1")
     lock_path.write_text(json.dumps(lock), encoding="utf-8")
     before_lock = lock_path.read_bytes()
+    # A retry repairs links even when canonical content has local edits and a different pin.
+    (claude_skills / "check-existing").unlink()
     again = subprocess.run(result.args, capture_output=True, text=True, timeout=180)
     assert again.returncode == 0, again.stderr
     assert "LOCAL_EDIT_SENTINEL" in protected.read_text(encoding="utf-8")
     assert lock_path.read_bytes() == before_lock
+    assert (claude_skills / "check-existing").resolve() == agents_skills / "check-existing"
+    assert (claude_skills / "check-existing/SKILL.md").is_file()
     assert not own_claude.is_symlink()
     assert (own_claude / "SKILL.md").read_text(encoding="utf-8") == "independent consumer skill"
     # A fresh checkout may have only a tracked pin, with both skill locations absent.
@@ -206,6 +210,18 @@ def test_skill_source_defaults_to_exact_release_tag(tmp_path, monkeypatch, origi
     assert existing.read_text() == "consumer rule"
     assert not (unpublished / ".agent-kit").exists()
     assert not (unpublished / ".codex").exists()
+    # An invalid explicit override must fail at the same preflight boundary.
+    for bad_source in (str(tmp_path / "missing"), "github:example/kit", "https://bad.invalid/kit"):
+        invalid = subprocess.run(
+            [*result.args, "--skill-source", bad_source],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert invalid.returncode != 0
+        assert "--skill-source" in invalid.stderr
+        assert existing.read_text() == "consumer rule"
+        assert not (unpublished / ".agent-kit").exists()
+        assert not (unpublished / ".codex").exists()
+        assert not (unpublished / "npx-call.json").exists()
 
 
 def test_empty_source_glob_does_not_crash(tmp_path):

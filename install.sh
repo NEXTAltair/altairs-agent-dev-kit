@@ -44,6 +44,7 @@ if [[ "$DO_SKILLS" -eq 1 ]]; then
   # Determine exactly which kit-owned names may be written before invoking npx.
   # Its non-interactive mode overwrites existing skills and lock entries.
   selected_skills=()
+  link_skills=()
   for skill_dir in "$KIT_DIR"/skills/*/; do
     [[ -f "${skill_dir}SKILL.md" ]] || continue
     name="$(basename "$skill_dir")"
@@ -55,6 +56,9 @@ if [[ "$DO_SKILLS" -eq 1 ]]; then
     fi
     if [[ "$FORCE" -eq 0 && ( -e "$canonical" || -L "$canonical" || -e "$link" || ( -L "$link" && "$owned_dangling_link" -eq 0 ) ) ]]; then
       echo "SKIP (exists): skill $name"
+      if [[ -f "$canonical/SKILL.md" && ! -e "$link" && ! -L "$link" ]]; then
+        link_skills+=("$name")
+      fi
     else
       selected_skills+=("$name")
     fi
@@ -63,6 +67,9 @@ if [[ "$DO_SKILLS" -eq 1 ]]; then
   if [[ ${#selected_skills[@]} -gt 0 ]]; then
     if [[ -n "$SKILL_SOURCE" && -d "$SKILL_SOURCE" ]]; then
       SKILL_SOURCE="$(cd "$SKILL_SOURCE" && pwd)"
+    elif [[ -n "$SKILL_SOURCE" && ! "$SKILL_SOURCE" =~ ^github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[^[:space:]]+$ ]]; then
+      echo "ERROR: --skill-source は存在するローカルディレクトリか github:owner/repo#ref を指定してください" >&2
+      exit 1
     fi
     # Published installs must keep a portable release tag in skills-lock.json.
     # Local/unpublished sources require an explicit --skill-source override.
@@ -135,9 +142,13 @@ fi
 if [[ "$DO_SKILLS" -eq 1 && ${#selected_skills[@]} -gt 0 ]]; then
     (cd "$TARGET" && npx --yes skills@1 add "$SKILL_SOURCE" --skill "${selected_skills[@]}" --agent codex -y)
 
-    # Link only the kit names just installed; unrelated consumer skills are untouched.
+    link_skills+=("${selected_skills[@]}")
+fi
+
+if [[ "$DO_SKILLS" -eq 1 && ${#link_skills[@]} -gt 0 ]]; then
+    # Restore missing links without reinstalling or changing canonical skills/pins.
     mkdir -p "$TARGET/.claude/skills"
-    for name in "${selected_skills[@]}"; do
+    for name in "${link_skills[@]}"; do
       skill_dir="$TARGET/.agents/skills/$name"
       [[ -f "$skill_dir/SKILL.md" ]] || { echo "ERROR: skill が導入されていません: $name" >&2; exit 1; }
       link="$TARGET/.claude/skills/$name"
