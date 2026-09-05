@@ -33,7 +33,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import emit_pretooluse_deny, find_project_root, load_hook_rules  # noqa: E402
+from hook_common import (
+    emit_pretooluse_deny,
+    find_project_root,
+    find_shared_root,
+    load_hook_rules,
+)
 
 DEFAULT_PROTECTED_DIRS = ["src", "tests"]
 
@@ -95,7 +100,7 @@ def main() -> None:
         if not file_path:
             sys.exit(0)
 
-        repo_root = find_project_root()
+        repo_root = find_shared_root(find_project_root())
         worktree_root = repo_root / ".agents" / "worktree"
         rules = load_hook_rules("pre_edit_worktree", repo_root)
         protected_dirs = rules.get("protected_dirs", DEFAULT_PROTECTED_DIRS)

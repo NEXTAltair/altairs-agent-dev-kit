@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import find_project_root  # noqa: E402
+from hook_common import find_project_root, find_shared_root
 
 # isolation worktree の配置先: リポジトリ内 .agents/worktree/。
 WORKTREE_SUBDIR = ".agents/worktree"
@@ -54,7 +54,7 @@ def main() -> None:
         sys.stderr.write(f"WorktreeCreate hook: payload 解析失敗: {e}")
         sys.exit(1)
 
-    repo = data.get("cwd") or str(find_project_root())
+    repo = find_shared_root(Path(data.get("cwd") or find_project_root()))
     worktree_base = Path(repo) / WORKTREE_SUBDIR
     # 現行スキーマは worktree_name。旧 payload 形状 (name) にもフォールバックする。
     worktree_path = worktree_base / _sanitize(data.get("worktree_name") or data.get("name") or "agent")
@@ -69,7 +69,7 @@ def main() -> None:
                 ["git", "worktree", "add", "--detach", str(worktree_path), source_ref],
                 cwd=repo,
                 capture_output=True,
-                text=True,
+                text=True, encoding="utf-8", errors="replace",
             )
             if result.returncode != 0:
                 sys.stderr.write(f"git worktree add 失敗: {result.stderr[-500:]}")
@@ -81,7 +81,7 @@ def main() -> None:
             ["git", "submodule", "update", "--init", "--recursive"],
             cwd=worktree_path,
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
         )
         if sub.returncode != 0:
             sys.stderr.write(f"⚠️ git submodule update --init 失敗: {sub.stderr[-300:]}")
