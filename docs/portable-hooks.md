@@ -15,7 +15,12 @@ contract accepts structured `hookSpecificOutput.permissionDecision=deny` with ex
 not document WorktreeCreate; this installer only registers PreToolUse and Stop.
 Continue creating Codex worktrees through Git/agent workflows.
 
-Windows requires Python on PATH; the container requires Python/Python3 and Git.
+Generated project registrations use `python` on Windows and `python3` on Linux.
+Regenerate these registrations when moving to a different OS. A shared project
+may explicitly use `python` on both if both environments provide that alias.
+The plugin template uses `python` on PATH on both OSes: on Debian/Ubuntu install
+the `python-is-python3` package, or use the project installer instead of the plugin.
+Git is also required.
 Neither hook startup nor installation syncs the application's virtual environment.
 `--codex` also renders a local config using the installation target's `.venv`;
 use a separate local config per OS and point worktrees to the main checkout's

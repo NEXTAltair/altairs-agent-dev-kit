@@ -61,7 +61,7 @@ def test_installed_launchers_and_overrides(tmp_path):
             handler = config["hooks"][event][0]["hooks"][0]
             if provider == "claude":
                 command = [
-                    sys.executable,
+                    handler["command"],
                     *[arg.replace("${CLAUDE_PROJECT_DIR}", str(target)) for arg in handler["args"]],
                 ]
             elif os.name == "nt":

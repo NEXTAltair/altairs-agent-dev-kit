@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -32,6 +33,7 @@ def claude_wiring() -> dict:
     for groups in config["hooks"].values():
         for group in groups:
             for hook in group["hooks"]:
+                hook["command"] = "python" if os.name == "nt" else "python3"
                 script = hook["args"][-1].rsplit("/", 1)[-1]
                 hook["args"] = ["-X", "utf8", "-c", hook_bootstrap(f".claude/hooks/{script}")]
     return config
