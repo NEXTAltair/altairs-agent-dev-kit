@@ -92,6 +92,12 @@ def test_install_skills_canonical_layout(tmp_path):
         assert link.resolve() == skill_dir.resolve(), f"{link} は {skill_dir} を指すべき"
         assert (link / "SKILL.md").exists(), "symlink 越しに SKILL.md が解決するべき"
 
+    # Restore an installer-owned dangling link without --force.
+    shutil.rmtree(agents_skills / "check-existing")
+    restored = subprocess.run(result.args, capture_output=True, text=True, timeout=180)
+    assert restored.returncode == 0, restored.stderr
+    assert (claude_skills / "check-existing/SKILL.md").is_file()
+
     protected = agents_skills / "check-existing/SKILL.md"
     original = protected.read_text(encoding="utf-8")
     protected.write_text(original + "\nLOCAL_EDIT_SENTINEL\n", encoding="utf-8")
@@ -185,13 +191,21 @@ def test_skill_source_defaults_to_exact_release_tag(tmp_path, monkeypatch, origi
     git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "unreleased")
     unpublished = tmp_path / "unpublished"
     unpublished.mkdir()
+    (kit / "rules").mkdir()
+    (kit / "rules/test.md").write_text("replacement")
+    existing = unpublished / ".claude/rules/test.md"
+    existing.parent.mkdir(parents=True)
+    existing.write_text("consumer rule")
     result = subprocess.run(
-        ["bash", str(kit / "install.sh"), "--target", str(unpublished), "--skills"],
+        ["bash", str(kit / "install.sh"), "--target", str(unpublished), "--all", "--force"],
         capture_output=True, text=True, timeout=30,
     )
     assert result.returncode != 0
     assert "--skill-source" in result.stderr
     assert not (unpublished / "npx-call.json").exists()
+    assert existing.read_text() == "consumer rule"
+    assert not (unpublished / ".agent-kit").exists()
+    assert not (unpublished / ".codex").exists()
 
 
 def test_empty_source_glob_does_not_crash(tmp_path):

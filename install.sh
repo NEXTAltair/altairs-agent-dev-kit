@@ -36,30 +36,6 @@ copy_file() {  # copy_file <src> <dest>
   fi
 }
 
-if [[ "$DO_RULES" -eq 1 ]]; then
-  for f in "$KIT_DIR"/rules/*.md; do copy_file "$f" "$TARGET/.claude/rules/$(basename "$f")"; done
-fi
-
-if [[ "$DO_AGENTS" -eq 1 ]]; then
-  for f in "$KIT_DIR"/agents/*.md; do copy_file "$f" "$TARGET/.claude/agents/$(basename "$f")"; done
-fi
-
-if [[ "$DO_HOOKS" -eq 1 ]]; then
-  hook_args=(--target "$TARGET")
-  [[ "$FORCE" -eq 0 ]] || hook_args+=(--force)
-  python3 -X utf8 "$KIT_DIR/scripts/install_harness.py" "${hook_args[@]}"
-fi
-
-if [[ "$DO_CODEX" -eq 1 ]]; then
-  python3 -X utf8 - "$KIT_DIR" "$TARGET" "$FORCE" <<'PYEOF'
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(sys.argv[1]) / "scripts"))
-from install_harness import install_codex
-install_codex(Path(sys.argv[2]), force=bool(int(sys.argv[3])))
-PYEOF
-fi
-
 if [[ "$DO_SKILLS" -eq 1 ]]; then
   command -v npx >/dev/null 2>&1 || {
     echo "ERROR: --skills には Node.js (npx) が必要です。https://nodejs.org からインストールするか、Node 導入後に再実行してください" >&2
@@ -73,7 +49,11 @@ if [[ "$DO_SKILLS" -eq 1 ]]; then
     name="$(basename "$skill_dir")"
     canonical="$TARGET/.agents/skills/$name"
     link="$TARGET/.claude/skills/$name"
-    if [[ "$FORCE" -eq 0 && ( -e "$canonical" || -L "$canonical" || -e "$link" || -L "$link" ) ]]; then
+    owned_dangling_link=0
+    if [[ -L "$link" && ! -e "$link" && "$(readlink "$link")" == "../../.agents/skills/$name" ]]; then
+      owned_dangling_link=1
+    fi
+    if [[ "$FORCE" -eq 0 && ( -e "$canonical" || -L "$canonical" || -e "$link" || ( -L "$link" && "$owned_dangling_link" -eq 0 ) ) ]]; then
       echo "SKIP (exists): skill $name"
     else
       selected_skills+=("$name")
@@ -125,6 +105,34 @@ for name in sys.argv[3:]:
         raise SystemExit(f"ERROR: {name} の既存 pin と導入元が異なります。固定版から復元するか、意図的な更新に --force を指定してください")
 PYEOF
     fi
+  fi
+fi
+
+if [[ "$DO_RULES" -eq 1 ]]; then
+  for f in "$KIT_DIR"/rules/*.md; do copy_file "$f" "$TARGET/.claude/rules/$(basename "$f")"; done
+fi
+
+if [[ "$DO_AGENTS" -eq 1 ]]; then
+  for f in "$KIT_DIR"/agents/*.md; do copy_file "$f" "$TARGET/.claude/agents/$(basename "$f")"; done
+fi
+
+if [[ "$DO_HOOKS" -eq 1 ]]; then
+  hook_args=(--target "$TARGET")
+  [[ "$FORCE" -eq 0 ]] || hook_args+=(--force)
+  python3 -X utf8 "$KIT_DIR/scripts/install_harness.py" "${hook_args[@]}"
+fi
+
+if [[ "$DO_CODEX" -eq 1 ]]; then
+  python3 -X utf8 - "$KIT_DIR" "$TARGET" "$FORCE" <<'PYEOF'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts"))
+from install_harness import install_codex
+install_codex(Path(sys.argv[2]), force=bool(int(sys.argv[3])))
+PYEOF
+fi
+
+if [[ "$DO_SKILLS" -eq 1 && ${#selected_skills[@]} -gt 0 ]]; then
     (cd "$TARGET" && npx --yes skills@1 add "$SKILL_SOURCE" --skill "${selected_skills[@]}" --agent codex -y)
 
     # Link only the kit names just installed; unrelated consumer skills are untouched.
@@ -141,7 +149,6 @@ PYEOF
         echo "COPY (symlink 非対応環境): .claude/skills/$name"
       fi
     done
-  fi
 fi
 
 echo "DONE"
