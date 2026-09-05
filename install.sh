@@ -89,10 +89,11 @@ if [[ "$DO_SKILLS" -eq 1 ]]; then
       fi
     fi
     if [[ "$SKILL_SOURCE" == github:* ]]; then
-      git check-ref-format --branch "${SKILL_SOURCE##*#}" >/dev/null 2>&1 || {
+      ref="${SKILL_SOURCE##*#}"
+      if ! git check-ref-format "refs/heads/$ref" >/dev/null 2>&1 && ! git check-ref-format "refs/tags/$ref" >/dev/null 2>&1; then
         echo "ERROR: --skill-source の ref は有効な Git branch/tag 名が必要です" >&2
         exit 1
-      }
+      fi
     fi
     if [[ "$FORCE" -eq 0 && -f "$TARGET/skills-lock.json" ]]; then
       # A fresh checkout can retain a pin without its ignored skill directory.

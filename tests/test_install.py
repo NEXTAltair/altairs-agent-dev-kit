@@ -192,6 +192,18 @@ def test_skill_source_defaults_to_exact_release_tag(tmp_path, monkeypatch, origi
     args = json.loads((target / "npx-call.json").read_text())
     assert args[args.index("add") + 1] == "github:example/kit#v9.8.7"
     assert args[args.index("--skill") + 1:args.index("--agent")] == ["one", "two"]
+    # Tags need not be valid --branch shorthand (e.g. HEAD or leading hyphen).
+    for ref in ("HEAD", "-release"):
+        tagged_target = tmp_path / f"tag-{ref}"
+        tagged_target.mkdir()
+        tagged = subprocess.run(
+            ["bash", str(kit / "install.sh"), "--target", str(tagged_target), "--skills",
+             "--skill-source", f"github:example/kit#{ref}"],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert tagged.returncode == 0, tagged.stderr
+        call = json.loads((tagged_target / "npx-call.json").read_text())
+        assert call[call.index("add") + 1] == f"github:example/kit#{ref}"
     # Untagged source must not silently become a local/unpinned dependency.
     git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "unreleased")
     unpublished = tmp_path / "unpublished"
