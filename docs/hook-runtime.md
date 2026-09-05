@@ -52,6 +52,14 @@ python scripts/install_harness.py --target /path/to/consumer --runtime-only
 旧 `.claude/hooks/hook_*.py` / `.codex/hooks/hook_*.py` を直接登録する形式は移行対象。
 plugin も事前に `--runtime-only` で lock を作る。plugin 自動更新だけでは branch pin は変更しない。
 
+Claude のプロジェクト登録を移行した後は `scripts/check_config_consistency.py --root <checkout>`
+で確認する。lock がある場合、既定で `PreToolUse` / `Stop` / `WorktreeCreate` の登録欠落・空登録・
+`disableAllHooks` を検出する。個別コマンドの内容が同じかまでは検査しない。
+一部イベントだけをプロジェクト設定で管理する場合は、consumer の
+`.claude/hooks/rules/consistency.json` の `required_hook_events` にそのイベント名の配列を宣言する。
+この検査は `.claude/settings.json` が対象で、Codex 設定や plugin/ユーザー設定からの自動登録は
+検証しない。それらだけを使う場合は明示的に空配列を指定し、各クライアントで登録を確認する。
+
 `--runtime-only` は登録設定を書き換えない。既存 lock とソースが違えば停止する。
 意図的な版更新には固定ソースを切り替えて `--force` を指定し、lock の差分をレビューする。
 起動コードの更新を含む場合は通常導入で設定も再生成する。`--force` は既存 runtime の上書きを許可しない。

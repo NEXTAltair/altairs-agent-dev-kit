@@ -348,3 +348,39 @@ def test_tracked_adapter_and_consumer_use_branch_runtime(tmp_path):
     assert result.returncode == 2
     assert "runtime unavailable" in result.stderr
     assert "payload" not in result.stdout
+
+
+def test_consistency_detects_lost_inline_registrations(tmp_path):
+    wiring = install(tmp_path)
+    settings = tmp_path / ".claude/settings.json"
+    settings.parent.mkdir()
+
+    def check(config):
+        settings.write_text(json.dumps(config), encoding="utf-8")
+        return subprocess.run(
+            [sys.executable, "-X", "utf8", str(KIT / "scripts/check_config_consistency.py"),
+             "--root", str(tmp_path)], capture_output=True, text=True, encoding="utf-8", timeout=20,
+        )
+
+    assert check(wiring).returncode == 0
+    result = check({})
+    assert result.returncode == 1
+    assert "required_hook_events" in result.stdout
+    for event in wiring["hooks"]:
+        missing = json.loads(json.dumps(wiring))
+        missing["hooks"][event] = [{"hooks": []}]
+        result = check(missing)
+        assert result.returncode == 1
+        assert event in result.stdout
+    assert check({**wiring, "disableAllHooks": True}).returncode == 1
+    settings.unlink()
+    result = subprocess.run(
+        [sys.executable, "-X", "utf8", str(KIT / "scripts/check_config_consistency.py"),
+         "--root", str(tmp_path)], capture_output=True, text=True, encoding="utf-8", timeout=20,
+    )
+    assert result.returncode == 1
+    # Consumers with a deliberately narrower project-level contract declare it explicitly.
+    policy = tmp_path / ".claude/hooks/rules/consistency.json"
+    policy.parent.mkdir(parents=True)
+    policy.write_text('{"required_hook_events":["Stop"]}', encoding="utf-8")
+    assert check({"hooks": {"Stop": wiring["hooks"]["Stop"]}}).returncode == 0

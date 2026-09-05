@@ -45,6 +45,23 @@ def main() -> int:
         if key not in env:
             violations.append(f"VIOLATION: settings.json env に {key} がない (required_env)")
 
+    # Inline launchers have no visible .py path and no flat hook files to compare.
+    # A branch pin therefore implies the installed Claude event contract by default.
+    required_events = consistency.get("required_hook_events")
+    if required_events is None:
+        required_events = (
+            ["PreToolUse", "Stop", "WorktreeCreate"]
+            if (root / ".agent-kit/hooks.lock.json").exists() else []
+        )
+    for event in required_events:
+        groups = settings.get("hooks", {}).get(event, [])
+        registered = any(
+            hook.get("type") == "command" and bool(hook.get("command", "").strip())
+            for group in groups for hook in group.get("hooks", [])
+        )
+        if settings.get("disableAllHooks") or not registered:
+            violations.append(f"VIOLATION: settings.json に有効な {event} hook がない (required_hook_events)")
+
     # (b)(c) hook 配線
     commands = list(iter_hook_commands(settings))
     wired_scripts: set[str] = set()
