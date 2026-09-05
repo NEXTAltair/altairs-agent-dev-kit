@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import emit_stop_block, find_project_root, get_log_dir, load_hook_rules  # noqa: E402
+from hook_common import emit_stop_block, find_project_root, get_log_dir, load_hook_rules
 
 
 def log_debug(log_dir: Path, message: str) -> None:
@@ -123,6 +123,9 @@ def extract_response_content(input_data: dict[str, Any]) -> str | None:
     実際の Stop イベント入力は {session_id, transcript_path, cwd, hook_event_name,
     stop_hook_active} のみ。応答本文は transcript (JSONL) の末尾 assistant エントリから読む。
     """
+    direct = input_data.get("last_assistant_message")
+    if isinstance(direct, str) and direct.strip():
+        return direct
     transcript_path = input_data.get("transcript_path", "")
     if transcript_path and Path(transcript_path).exists():
         try:
@@ -163,6 +166,8 @@ def main() -> None:
             sys.exit(0)
 
         input_data: dict[str, Any] = json.load(sys.stdin)
+        if input_data.get("stop_hook_active"):
+            sys.exit(0)
 
         root = find_project_root()
         log_dir = get_log_dir(root)

@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import emit_pretooluse_deny, find_project_root, get_log_dir, load_hook_rules  # noqa: E402
+from hook_common import emit_pretooluse_deny, find_project_root, get_log_dir, load_hook_rules
 
 
 def log_debug(log_dir: Path, message: str) -> None:
@@ -62,7 +62,7 @@ def get_changed_paths(project_root: Path) -> list[str]:
             ["git", "diff", "--name-only", "origin/main...HEAD"],
             cwd=project_root,
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=10,
         )
         if result.returncode != 0:
@@ -126,7 +126,8 @@ def main() -> None:
 
     try:
         input_data: dict[str, Any] = json.load(sys.stdin)
-        command = input_data.get("tool_input", {}).get("command", "")
+        tool_input = input_data.get("tool_input", {})
+        command = tool_input.get("command") or tool_input.get("cmd", "")
         if not command or not is_gh_pr_create(command):
             sys.exit(0)
 

@@ -28,7 +28,13 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import emit_pretooluse_deny, find_project_root, get_log_dir, load_hook_rules  # noqa: E402
+from hook_common import (
+    emit_pretooluse_deny,
+    find_project_root,
+    find_shared_root,
+    get_log_dir,
+    load_hook_rules,
+)
 
 PROJECT_ROOT: Path = Path.cwd()
 LOG_DIR: Path = get_log_dir(PROJECT_ROOT)
@@ -88,7 +94,7 @@ def _is_under_worktree(path: str | Path) -> bool:
 def _command_cd_worktree(command: str) -> bool:
     """command 内の `cd <project_root>/.agents/worktree/...` を検出する。"""
     try:
-        parts = shlex.split(command)
+        parts = [part.strip("\"'") for part in shlex.split(command, posix=os.name != "nt")]
     except ValueError:
         pattern = rf"\bcd\s+{re.escape(str(WORKTREE_ROOT))}(?:/|\b)"
         return bool(re.search(pattern, command))
@@ -119,7 +125,10 @@ def _has_shared_uv_environment(command: str) -> bool:
     """共有 venv の UV_PROJECT_ENVIRONMENT 指定を検出する。"""
     shared_uv_env = f"{SHARED_UV_ENV_NAME}={SHARED_UV_ENV_VALUE}"
     pattern = rf"(^|[\s;&|])(?:env\s+)?{re.escape(shared_uv_env)}(?:\s|$)"
-    return bool(re.search(pattern, command)) or os.environ.get(SHARED_UV_ENV_NAME) == SHARED_UV_ENV_VALUE
+    configured = os.environ.get(SHARED_UV_ENV_NAME)
+    return bool(re.search(pattern, command)) or bool(
+        configured and Path(configured).resolve() == Path(SHARED_UV_ENV_VALUE).resolve()
+    )
 
 
 def _is_bare_uv_command(command: str) -> bool:
@@ -234,7 +243,7 @@ def _branch_is_integrated(branch: str) -> bool:
         result = subprocess.run(
             ["gh", "pr", "list", "--head", branch, "--state", "merged", "--json", "number"],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=10,
         )
         if result.returncode == 0 and result.stdout.strip() not in ("", "[]"):
@@ -314,14 +323,16 @@ def main() -> None:
     global PROJECT_ROOT, LOG_DIR, WORKTREE_ROOT, SHARED_UV_ENV_VALUE
     PROJECT_ROOT = find_project_root()
     LOG_DIR = get_log_dir(PROJECT_ROOT)
-    WORKTREE_ROOT = PROJECT_ROOT / ".agents" / "worktree"
-    SHARED_UV_ENV_VALUE = str(PROJECT_ROOT / ".venv")
+    shared_root = find_shared_root(PROJECT_ROOT)
+    WORKTREE_ROOT = shared_root / ".agents" / "worktree"
+    SHARED_UV_ENV_VALUE = str(shared_root / ".venv")
 
     log_debug("=== Pre-Commands Hook ===")
 
     try:
         input_data: dict[str, Any] = json.load(sys.stdin)
-        command = input_data.get("tool_input", {}).get("command", "")
+        tool_input = input_data.get("tool_input", {})
+        command = tool_input.get("command") or tool_input.get("cmd", "")
         if not command:
             sys.exit(0)
 

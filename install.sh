@@ -43,37 +43,19 @@ if [[ "$DO_AGENTS" -eq 1 ]]; then
 fi
 
 if [[ "$DO_HOOKS" -eq 1 ]]; then
-  for f in "$KIT_DIR"/hooks/scripts/*.py; do copy_file "$f" "$TARGET/.claude/hooks/$(basename "$f")"; done
-  for f in "$KIT_DIR"/hooks/rules/*.default.json; do copy_file "$f" "$TARGET/.claude/hooks/rules/$(basename "$f")"; done
-  chmod +x "$TARGET"/.claude/hooks/hook_*.py
-  echo ""
-  echo "== settings.json へ以下の hooks 配線を手動追加してください =="
-  # install.sh はスクリプトを <target>/.claude/hooks/*.py にフラット配置するため
-  # (Claude Code プラグイン経路の ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/ とは異なる)、
-  # hooks.json テンプレートの参照を導入先の実パスへ書き換えて表示する。
-  python3 - "$KIT_DIR/hooks/hooks.json" "$TARGET" <<'PYEOF'
-import sys
-from pathlib import Path
-template, target = sys.argv[1], sys.argv[2]
-text = Path(template).read_text(encoding="utf-8")
-old = '\\"${CLAUDE_PLUGIN_ROOT}\\"/hooks/scripts/'
-new = f'\\"{target}\\"/.claude/hooks/'
-print(text.replace(old, new), end="")
-PYEOF
+  hook_args=(--target "$TARGET")
+  [[ "$FORCE" -eq 0 ]] || hook_args+=(--force)
+  python3 -X utf8 "$KIT_DIR/scripts/install_harness.py" "${hook_args[@]}"
 fi
 
 if [[ "$DO_CODEX" -eq 1 ]]; then
-  mkdir -p "$TARGET/.codex/agents"
-  dest="$TARGET/.codex/config.toml"
-  [[ -e "$dest" && "$FORCE" -eq 0 ]] && dest="$dest.new"
-  python3 - "$KIT_DIR/codex/config.toml.template" "$TARGET" > "$dest" <<'PYEOF'
+  python3 -X utf8 - "$KIT_DIR" "$TARGET" "$FORCE" <<'PYEOF'
 import sys
 from pathlib import Path
-template, target = sys.argv[1], sys.argv[2]
-print(Path(template).read_text(encoding="utf-8").replace("{{PROJECT_ROOT}}", target), end="")
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts"))
+from install_harness import install_codex
+install_codex(Path(sys.argv[2]), force=bool(int(sys.argv[3])))
 PYEOF
-  echo "INSTALL: $dest"
-  for f in "$KIT_DIR"/codex/agents/*.toml; do copy_file "$f" "$TARGET/.codex/agents/$(basename "$f")"; done
 fi
 
 if [[ "$DO_SKILLS" -eq 1 ]]; then

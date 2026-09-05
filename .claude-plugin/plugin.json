@@ -1,7 +1,15 @@
 {
   "name": "altairs-agent-dev-kit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "AI エージェント開発標準 kit: skills / rules / hooks / agents を任意リポジトリへ",
+  "userConfig": {
+    "python_command": {
+      "type": "string",
+      "title": "Python executable",
+      "description": "Python 3 executable: python3 on Linux, python on Windows, or an absolute executable path.",
+      "default": "python3"
+    }
+  },
   "author": {
     "name": "NEXTAltair"
   }

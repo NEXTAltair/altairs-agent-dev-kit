@@ -38,13 +38,26 @@ cd altairs-agent-dev-kit
 | `--skills` | skills 15 本 → `<repo>/.agents/skills/` (実体) + `<repo>/.claude/skills/` (symlink)。skills.sh CLI 経由、**要 Node.js/npx** |
 | `--rules` | `rules/*.md` → `<repo>/.claude/rules/` |
 | `--agents` | `agents/*.md` → `<repo>/.claude/agents/` |
-| `--hooks` | hooks スクリプト + default rules → `<repo>/.claude/hooks/` |
+| `--hooks` | 版固定した runtime → `<repo>/.agent-kit/runtimes/`、起動設定を生成 |
 | `--codex` | `.codex/config.toml` + `agents/*.toml` |
 | `--all` | 上記すべて |
 | `--force` | 既存ファイルも上書き (`--force` なしは `SKIP (exists)`) |
 
 `--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するだけなので、
 表示された JSON を `<repo>/.claude/settings.json` の `hooks` キーへ手動で貼り付けること。
+
+Windows / Linux 共通のフック導入には次も利用できる (Python 3.10+ と Git が必要):
+
+```text
+python -X utf8 scripts/install_harness.py --target <project-directory> --codex
+```
+
+Claude の共通ランタイムと Codex adapter を導入し、Codex の `hooks.json` を生成する。
+既存設定は `.new` に提案を保存し、プロジェクトの override JSON は変更しない。
+既存ランタイムを更新するときだけ `--force` を指定する。Claude 配線は表示された JSON を
+既存の設定へマージする。`install.sh --hooks` も同じ処理を利用する。
+OS 固有の共有環境パスはローカルの Codex 設定で管理し、Windows とコンテナで共有しない。
+詳細は [docs/portable-hooks.md](docs/portable-hooks.md) を参照。
 
 その他の導入経路 (Claude Code プラグイン / skills.sh 単体) は
 [docs/adoption.md](docs/adoption.md) を参照。

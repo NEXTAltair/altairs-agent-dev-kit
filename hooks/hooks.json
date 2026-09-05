@@ -2,15 +2,33 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/timeout 5s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_pre_commands.py"
+            "command": "${user_config.python_command}",
+            "args": [
+              "-I",
+              "-X",
+              "utf8",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_pre_commands.py",
+              "PreToolUse"
+            ],
+            "timeout": 5
           },
           {
             "type": "command",
-            "command": "/usr/bin/timeout 15s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_pre_pr_submodule_check.py"
+            "command": "${user_config.python_command}",
+            "args": [
+              "-I",
+              "-X",
+              "utf8",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_pre_pr_submodule_check.py",
+              "PreToolUse"
+            ],
+            "timeout": 15
           }
         ]
       },
@@ -19,7 +37,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/timeout 5s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_pre_edit_worktree.py"
+            "command": "${user_config.python_command}",
+            "args": [
+              "-I",
+              "-X",
+              "utf8",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_pre_edit_worktree.py",
+              "PreToolUse"
+            ],
+            "timeout": 5
           }
         ]
       }
@@ -29,7 +56,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/timeout 5s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_response_monitor.py"
+            "command": "${user_config.python_command}",
+            "args": [
+              "-I",
+              "-X",
+              "utf8",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_response_monitor.py",
+              "Stop"
+            ],
+            "timeout": 5
           }
         ]
       }
@@ -39,7 +75,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/timeout 120s \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/hook_worktree_create.py"
+            "command": "${user_config.python_command}",
+            "args": [
+              "-I",
+              "-X",
+              "utf8",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_worktree_create.py",
+              "WorktreeCreate"
+            ],
+            "timeout": 120
           }
         ]
       }

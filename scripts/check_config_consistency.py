@@ -7,7 +7,7 @@ rules は「設定済み」と書いたままになる drift が実際に起き�
 
 import argparse
 import json
-import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -25,7 +25,7 @@ def iter_hook_commands(settings: dict):
         for entry in entries:
             for hook in entry.get("hooks", []):
                 if hook.get("type") == "command":
-                    yield hook.get("command", "")
+                    yield hook.get("command", "") + " " + shlex.join(hook.get("args", []))
 
 
 def main() -> int:
@@ -45,15 +45,39 @@ def main() -> int:
         if key not in env:
             violations.append(f"VIOLATION: settings.json env に {key} がない (required_env)")
 
+    # Inline launchers have no visible .py path and no flat hook files to compare.
+    # A branch pin therefore implies the installed Claude event contract by default.
+    required_events = consistency.get("required_hook_events")
+    if required_events is None:
+        required_events = (
+            ["PreToolUse", "Stop", "WorktreeCreate"]
+            if (root / ".agent-kit/hooks.lock.json").exists() else []
+        )
+    for event in required_events:
+        groups = settings.get("hooks", {}).get(event, [])
+        registered = any(
+            hook.get("type") == "command" and bool(hook.get("command", "").strip())
+            for group in groups for hook in group.get("hooks", [])
+        )
+        if settings.get("disableAllHooks") or not registered:
+            violations.append(f"VIOLATION: settings.json に有効な {event} hook がない (required_hook_events)")
+
     # (b)(c) hook 配線
     commands = list(iter_hook_commands(settings))
     wired_scripts: set[str] = set()
     for cmd in commands:
         # プラグイン配線 ("${CLAUDE_PLUGIN_ROOT}"/... 形式) も解決できるよう、
         # 既知の変数を root に展開してからパスを抽出する (kit 自身では plugin root == repo root)。
-        for var in ("${CLAUDE_PLUGIN_ROOT}", "$CLAUDE_PLUGIN_ROOT", "${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
-            cmd = cmd.replace(f'"{var}"', str(root)).replace(var, str(root))
-        for match in re.findall(r"\S+\.py", cmd):
+        for match in shlex.split(cmd):
+            for var in (
+                "${CLAUDE_PLUGIN_ROOT}",
+                "$CLAUDE_PLUGIN_ROOT",
+                "${CLAUDE_PROJECT_DIR}",
+                "$CLAUDE_PROJECT_DIR",
+            ):
+                match = match.replace(var, str(root))
+            if not match.endswith(".py"):
+                continue
             script = Path(match)
             resolved = script if script.is_absolute() else root / script
             wired_scripts.add(resolved.name)

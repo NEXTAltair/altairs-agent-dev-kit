@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any, NoReturn
 
+
 def _default_rules_dir() -> Path:
     """default rules ディレクトリを配置形態に応じて解決する。
 
@@ -32,13 +33,13 @@ DEFAULT_RULES_DIR = _default_rules_dir()
 
 
 def find_project_root() -> Path:
-    env = os.environ.get("CLAUDE_PROJECT_DIR")
+    env = os.environ.get("AGENT_KIT_PROJECT_DIR") or os.environ.get("CLAUDE_PROJECT_DIR")
     if env:
         return Path(env)
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, check=True, timeout=5,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=True, timeout=5,
         )
         return Path(out.stdout.strip()).resolve()
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
@@ -46,7 +47,25 @@ def find_project_root() -> Path:
 
 
 def get_log_dir(root: Path) -> Path:
+    if os.environ.get("AGENT_KIT_PROVIDER") == "codex":
+        return root / ".codex" / "logs"
     return root / ".claude" / "logs"
+
+
+def find_shared_root(root: Path) -> Path:
+    """Find the main checkout containing the shared environment from a linked worktree."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            check=True, timeout=5,
+        )
+        common = Path(result.stdout.strip())
+        if common.name == ".git":
+            return common.parent.resolve()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return root.resolve()
 
 
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
