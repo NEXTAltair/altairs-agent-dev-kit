@@ -67,6 +67,15 @@ def failure(event, error):
         print(json.dumps({"hookSpecificOutput": {"hookEventName": event,
               "permissionDecision": "deny", "permissionDecisionReason": reason}}))
     elif event == "Stop":
+        # The runtime's own recursion guard cannot run when startup failed.
+        # Read stdin only on this failure path; successful consumer launches
+        # must receive the original stream unchanged.
+        try:
+            payload = json.load(sys.stdin)
+        except (OSError, ValueError):
+            payload = None
+        if isinstance(payload, dict) and payload.get("stop_hook_active"):
+            return
         print(json.dumps({"decision": "block", "reason": reason}))
     else:
         raise SystemExit(2)

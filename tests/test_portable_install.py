@@ -105,10 +105,11 @@ def test_runtime_failures_and_consumer_startup(tmp_path):
         "from hook_common import find_project_root\nprint(find_project_root())\n", encoding="utf-8"
     )
 
-    def run(script="hook_pre_commands.py", event="PreToolUse", custom=False, cwd=target):
+    def run(script="hook_pre_commands.py", event="PreToolUse", custom=False, cwd=target,
+            payload='{"tool_input":{"command":"git reset --hard"}}'):
         return subprocess.run(
             [sys.executable, "-X", "utf8", "-c", hook_bootstrap(script, event=event, consumer=custom)],
-            input='{"tool_input":{"command":"git reset --hard"}}', cwd=cwd,
+            input=payload, cwd=cwd,
             capture_output=True, text=True, encoding="utf-8", timeout=20,
         )
 
@@ -130,6 +131,10 @@ def test_runtime_failures_and_consumer_startup(tmp_path):
                 assert json.loads(result.stdout)["decision"] == "block"
             else:
                 assert result.returncode == 2
+        recursive = run(event="Stop", payload='{"stop_hook_active":true}')
+        assert recursive.returncode == 0, recursive.stderr
+        assert recursive.stdout == ""
+        assert "runtime unavailable" in recursive.stderr
     lock_path.write_text(original, encoding="utf-8")
     lock = json.loads(original)
     runtime = target / ".agent-kit/runtimes" / lock["runtime"]
@@ -145,6 +150,11 @@ def test_runtime_failures_and_consumer_startup(tmp_path):
     assert "runtime unavailable" in run().stderr
     # Non-repository startup must not silently use cwd as a valid root.
     assert "runtime unavailable" in run(cwd=tmp_path).stderr
+    for cwd in (target, tmp_path):
+        recursive = run(event="Stop", cwd=cwd, payload='{"stop_hook_active":true}')
+        assert recursive.returncode == 0, recursive.stderr
+        assert recursive.stdout == ""
+        assert "runtime unavailable" in recursive.stderr
 
 
 def test_atomic_restore_and_branch_versions(tmp_path, monkeypatch):

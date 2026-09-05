@@ -72,6 +72,8 @@ installer が動いていないことを確認して空のディレクトリを�
 runtime 欠損・版不一致・不正 lock・Git root 検出失敗は stderr に `agent-kit runtime unavailable`
 と復元案内を出す。PreToolUse は stdout の `hookSpecificOutput.permissionDecision=deny`、
 Stop は `decision=block` (ともに exit 0 の構造化拒否) を返す。
+Stop の再入 (`stop_hook_active: true`) は stderr に診断を残して exit 0 で終了し、
+再び停止を拒否して無限ループすることを防ぐ。
 WorktreeCreate / TeammateIdle などは exit 2 で失敗する。正常な検査成功として扱わない。
 固有 hook 本体の出力契約は consumer の責務。
 
