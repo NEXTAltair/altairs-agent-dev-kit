@@ -25,9 +25,10 @@ enabling the plugin. Claude substitutes this setting directly into the exec comm
 no shell wrapper or optional Linux `python` alias is required.
 Git is also required.
 Neither hook startup nor installation syncs the application's virtual environment.
-`--codex` also renders a local config using the installation target's `.venv`;
-use a separate local config per OS and point worktrees to the main checkout's
-environment. A copied Linux environment path is not a valid Windows environment.
+`--codex` writes config into the installation target while pointing its environment
+at the shared checkout's `.venv`, including when the target is a linked worktree.
+Use a separate local config per OS. A copied Linux environment path is not a valid
+Windows environment.
 
 Runtime files are verified and published under a content hash. Existing versions
 are never overwritten, including with `--force`; that flag permits changing the

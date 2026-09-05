@@ -384,3 +384,46 @@ def test_consistency_detects_lost_inline_registrations(tmp_path):
     policy.parent.mkdir(parents=True)
     policy.write_text('{"required_hook_events":["Stop"]}', encoding="utf-8")
     assert check({"hooks": {"Stop": wiring["hooks"]["Stop"]}}).returncode == 0
+
+
+def test_codex_worktree_config_uses_shared_environment(tmp_path):
+    from install_harness import hook_bootstrap
+
+    main = tmp_path / "shared 日本語"
+    main.mkdir()
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(main), *args], check=True, capture_output=True)
+
+    git("init")
+    git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "init")
+    main_config = main / ".codex/config.toml"
+    main_config.parent.mkdir()
+    main_config.write_text("# preserve shared config\n", encoding="utf-8")
+    for route in (("python",) if os.name == "nt" else ("python", "shell")):
+        child = main / ".agents/worktree" / route
+        git("worktree", "add", "--detach", str(child))
+        if route == "python":
+            install(child, codex=True)
+        else:
+            result = subprocess.run(
+                ["bash", str(KIT / "install.sh"), "--target", str(child), "--hooks", "--codex"],
+                capture_output=True, text=True, encoding="utf-8", timeout=30,
+            )
+            assert result.returncode == 0, result.stderr
+        config = (child / ".codex/config.toml").read_text(encoding="utf-8")
+        line = next(line for line in config.splitlines() if line.startswith("UV_PROJECT_ENVIRONMENT ="))
+        environment = json.loads(line.split("=", 1)[1].strip())
+        assert Path(environment) == main / ".venv"
+        assert main_config.read_text(encoding="utf-8") == "# preserve shared config\n"
+        override = child / ".claude/hooks/rules/pre_commands.json"
+        override.parent.mkdir(parents=True)
+        override.write_text('{"worktree_uv_guard":true}', encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, "-I", "-X", "utf8", "-c", hook_bootstrap("hook_pre_commands.py")],
+            cwd=child, env={**os.environ, "UV_PROJECT_ENVIRONMENT": environment},
+            input='{"tool_input":{"command":"uv run pytest"}}',
+            capture_output=True, text=True, encoding="utf-8", timeout=20,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == "", result.stdout

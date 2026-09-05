@@ -49,17 +49,13 @@ if [[ "$DO_HOOKS" -eq 1 ]]; then
 fi
 
 if [[ "$DO_CODEX" -eq 1 ]]; then
-  mkdir -p "$TARGET/.codex/agents"
-  dest="$TARGET/.codex/config.toml"
-  [[ -e "$dest" && "$FORCE" -eq 0 ]] && dest="$dest.new"
-  python3 - "$KIT_DIR/codex/config.toml.template" "$TARGET" > "$dest" <<'PYEOF'
+  python3 -X utf8 - "$KIT_DIR" "$TARGET" "$FORCE" <<'PYEOF'
 import sys
 from pathlib import Path
-template, target = sys.argv[1], sys.argv[2]
-print(Path(template).read_text(encoding="utf-8").replace("{{PROJECT_ROOT}}", target), end="")
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts"))
+from install_harness import install_codex
+install_codex(Path(sys.argv[2]), force=bool(int(sys.argv[3])))
 PYEOF
-  echo "INSTALL: $dest"
-  for f in "$KIT_DIR"/codex/agents/*.toml; do copy_file "$f" "$TARGET/.codex/agents/$(basename "$f")"; done
 fi
 
 if [[ "$DO_SKILLS" -eq 1 ]]; then

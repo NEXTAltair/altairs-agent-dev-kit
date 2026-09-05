@@ -100,6 +100,16 @@ def atomic_json(path: Path, data: dict) -> None:
         Path(temporary).unlink(missing_ok=True)
 
 
+def shared_checkout(target: Path) -> Path:
+    """Locate shared resources; permit non-Git installation staging directories."""
+    if (target / ".git").exists():
+        common = git_root(target, "--path-format=absolute", "--git-common-dir")
+        if common.name != ".git":
+            raise ValueError("unsupported Git layout")
+        return common.parent
+    return target.resolve()
+
+
 def install_runtime(target: Path, force: bool = False) -> dict:
     """Publish a verified immutable runtime, then atomically pin this checkout.
 
@@ -114,12 +124,7 @@ def install_runtime(target: Path, force: bool = False) -> dict:
         if json.loads(lock_path.read_text(encoding="utf-8")) != lock:
             raise ValueError("source differs from branch lock; restore its pinned source or use --force to repin")
     # Installation into a non-Git staging directory is supported. Execution requires Git.
-    shared = target
-    if (target / ".git").exists():
-        common = git_root(target, "--path-format=absolute", "--git-common-dir")
-        if common.name != ".git":
-            raise ValueError("unsupported Git layout")
-        shared = common.parent
+    shared = shared_checkout(target)
     store = shared / ".agent-kit/runtimes"
     store.mkdir(parents=True, exist_ok=True)
     destination = store / lock["runtime"]
@@ -157,17 +162,22 @@ def install_runtime(target: Path, force: bool = False) -> dict:
     return lock
 
 
+def install_codex(target: Path, force: bool = False) -> None:
+    # Config belongs to the target checkout; the environment belongs to shared.
+    shared = shared_checkout(target)
+    template = (KIT / "codex/config.toml.template").read_text(encoding="utf-8")
+    # Forward slashes work on Windows; escape quotes/control characters for TOML.
+    root_value = json.dumps(shared.as_posix(), ensure_ascii=False)[1:-1]
+    write_config(target / ".codex/config.toml", template.replace("{{PROJECT_ROOT}}", root_value), force)
+    for source in (KIT / "codex/agents").glob("*.toml"):
+        copy_file(source, target / ".codex/agents" / source.name, force)
+
+
 def install(target: Path, force: bool = False, codex: bool = False) -> dict:
     install_runtime(target, force)
     write_config(target / ".codex/hooks.json", json.dumps(codex_wiring(), indent=2) + "\n", force)
     if codex:
-        # POSIX spelling is also a valid Windows absolute path and avoids TOML escapes.
-        template = (KIT / "codex/config.toml.template").read_text(encoding="utf-8")
-        write_config(
-            target / ".codex/config.toml", template.replace("{{PROJECT_ROOT}}", target.as_posix()), force
-        )
-        for source in (KIT / "codex/agents").glob("*.toml"):
-            copy_file(source, target / ".codex/agents" / source.name, force)
+        install_codex(target, force)
     return claude_wiring()
 
 
