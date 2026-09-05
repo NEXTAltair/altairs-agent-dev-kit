@@ -8,9 +8,12 @@
             "type": "command",
             "command": "${user_config.python_command}",
             "args": [
+              "-I",
               "-X",
               "utf8",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/hook_pre_commands.py"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_pre_commands.py",
+              "PreToolUse"
             ],
             "timeout": 5
           },
@@ -18,9 +21,12 @@
             "type": "command",
             "command": "${user_config.python_command}",
             "args": [
+              "-I",
               "-X",
               "utf8",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/hook_pre_pr_submodule_check.py"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_pre_pr_submodule_check.py",
+              "PreToolUse"
             ],
             "timeout": 15
           }
@@ -33,9 +39,12 @@
             "type": "command",
             "command": "${user_config.python_command}",
             "args": [
+              "-I",
               "-X",
               "utf8",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/hook_pre_edit_worktree.py"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_pre_edit_worktree.py",
+              "PreToolUse"
             ],
             "timeout": 5
           }
@@ -49,9 +58,12 @@
             "type": "command",
             "command": "${user_config.python_command}",
             "args": [
+              "-I",
               "-X",
               "utf8",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/hook_response_monitor.py"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_response_monitor.py",
+              "Stop"
             ],
             "timeout": 5
           }
@@ -65,9 +77,12 @@
             "type": "command",
             "command": "${user_config.python_command}",
             "args": [
+              "-I",
               "-X",
               "utf8",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/hook_worktree_create.py"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_worktree_create.py",
+              "WorktreeCreate"
             ],
             "timeout": 120
           }

@@ -100,9 +100,10 @@ def main() -> None:
         if not file_path:
             sys.exit(0)
 
-        repo_root = find_shared_root(find_project_root())
+        active_root = find_project_root()
+        repo_root = find_shared_root(active_root)
         worktree_root = repo_root / ".agents" / "worktree"
-        rules = load_hook_rules("pre_edit_worktree", repo_root)
+        rules = load_hook_rules("pre_edit_worktree", active_root)
         protected_dirs = rules.get("protected_dirs", DEFAULT_PROTECTED_DIRS)
 
         if _is_blocked(file_path, repo_root, worktree_root, protected_dirs):

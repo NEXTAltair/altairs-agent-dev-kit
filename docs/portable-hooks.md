@@ -5,8 +5,9 @@ override JSON and event registrations, not independent copies maintained by hand
 
 The plugin template uses Claude exec-form commands (`command`, `args`) and native
 timeout fields. Installed project registrations resolve the active Git root and
-fall back to the main checkout's runtime when a new linked worktree has no installed
-hooks. Policy overrides still come from the active checkout. Explicit UTF-8 handles
+select the runtime pinned by that checkout's `.agent-kit/hooks.lock.json`, including
+the matching version in the shared checkout. Policy overrides still come from the
+active checkout. Explicit UTF-8 handles
 non-ASCII repository names on Windows.
 
 Codex adapters select the provider and reuse shared policy. The current PreToolUse
@@ -28,11 +29,14 @@ Neither hook startup nor installation syncs the application's virtual environmen
 use a separate local config per OS and point worktrees to the main checkout's
 environment. A copied Linux environment path is not a valid Windows environment.
 
-Existing runtime files are skipped unless `--force` is given. Existing generated
-Codex config is preserved and a `.new` proposal is created. If that proposal also
-exists, installation fails rather than silently replacing it. `--force` replaces
-kit files and generated Codex config; review local customizations first.
-Only `*.default.json` rules are installed, so project override rules remain intact.
+Runtime files are verified and published under a content hash. Existing versions
+are never overwritten, including with `--force`; that flag permits changing the
+checkout's pin and replacing generated config. Existing generated Codex config is
+otherwise preserved and a `.new` proposal is created. If that proposal also exists,
+installation fails rather than silently replacing it. Project override rules remain
+intact. Track the lock and registrations in Git; ignore runtime directories.
+Plugins also require a branch lock before enabling hooks. See the
+[runtime contract](hook-runtime.md) for setup, consumer hook integration, and recovery.
 
 After migration, check user-level and project-local hook settings for duplicate
 registrations. Restart the agent and review changed Codex hooks in `/hooks` when

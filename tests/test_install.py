@@ -1,5 +1,4 @@
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -25,14 +24,11 @@ def test_install_rules_and_agents(tmp_path):
 def test_install_hooks_prints_wiring(tmp_path):
     result = run_install(tmp_path, "--hooks")
     assert result.returncode == 0, result.stderr
-    assert (tmp_path / ".claude" / "hooks" / "hook_pre_commands.py").exists()
+    assert (tmp_path / ".agent-kit/hooks.lock.json").exists()
     assert "hooks" in result.stdout  # hooks.json 断片が表示される
 
 
-def test_install_hooks_wiring_uses_flat_install_paths(tmp_path):
-    # install.sh --hooks が表示する配線 JSON は、プラグイン経路の
-    # ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/... ではなく、実際にコピーされた
-    # <target>/.claude/hooks/hook_*.py の絶対パスを指していなければならない。
+def test_install_hooks_wiring_uses_standalone_bootstrap(tmp_path):
     result = run_install(tmp_path, "--hooks")
     assert result.returncode == 0, result.stderr
     assert "CLAUDE_PLUGIN_ROOT" not in result.stdout
@@ -41,24 +37,31 @@ def test_install_hooks_wiring_uses_flat_install_paths(tmp_path):
     json_start = result.stdout.index("{")
     json_end = result.stdout.rindex("}") + 1
     payload = json.loads(result.stdout[json_start:json_end])
-    hook_paths = [
-        tmp_path / re.search(r"\.claude/hooks/[\w_]+\.py", h["args"][-1]).group()
+    commands = [
+        h["args"]
         for entries in payload["hooks"].values()
         for entry in entries
         for h in entry["hooks"]
     ]
-    assert hook_paths
-    for path in hook_paths:
-        assert Path(path).exists(), path
+    assert commands
+    for args in commands:
+        assert args[:4] == ["-I", "-X", "utf8", "-c"]
+    lock = json.loads((tmp_path / ".agent-kit/hooks.lock.json").read_text())
+    for name in lock["files"]:
+        assert (tmp_path / ".agent-kit/runtimes" / lock["runtime"] / name).is_file()
 
 
-def test_install_skills_requires_npx(tmp_path, monkeypatch):
+def test_install_skills_requires_npx(tmp_path):
     # --skills は skills.sh CLI (npx skills) に委譲する。npx (Node.js) が無い環境では
     # 黙ってフォールバックせず、明確なエラーメッセージ付きで exit 1 する。
+    # /usr/bin may itself contain npx. Expose only the installer's prerequisite.
+    isolated_bin = tmp_path / "bin"
+    isolated_bin.mkdir()
+    (isolated_bin / "dirname").symlink_to(shutil.which("dirname"))
     result = subprocess.run(
-        ["bash", str(KIT / "install.sh"), "--target", str(tmp_path), "--skills"],
+        [shutil.which("bash"), str(KIT / "install.sh"), "--target", str(tmp_path), "--skills"],
         capture_output=True, text=True, timeout=30,
-        env={"PATH": "/usr/bin:/bin"},
+        env={"PATH": str(isolated_bin)},
     )
     assert result.returncode == 1
     assert "Node" in result.stderr
@@ -126,20 +129,18 @@ def test_codex_target_with_ampersand(tmp_path):
     assert "{{PROJECT_ROOT}}" not in config
 
 
-def test_installed_hooks_flat_layout_resolves_default_rules(tmp_path):
-    # install.sh --hooks はスクリプトを <target>/.claude/hooks/*.py に、
-    # default rules を <target>/.claude/hooks/rules/*.default.json にフラット配置する。
-    # この配置で hook_pre_commands.py を実行すると default の
-    # git reset --hard ブロックが有効に解決される (permissionDecision=deny) ことを確認する。
+def test_installed_hooks_resolve_pinned_default_rules(tmp_path):
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
     result = run_install(tmp_path, "--hooks")
     assert result.returncode == 0, result.stderr
 
-    hook = tmp_path / ".claude" / "hooks" / "hook_pre_commands.py"
-    assert hook.exists()
+    wiring = json.loads(result.stdout[result.stdout.index("{"):result.stdout.rindex("}") + 1])
+    args = wiring["hooks"]["PreToolUse"][0]["hooks"][0]["args"]
 
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git reset --hard HEAD~1"}})
     proc = subprocess.run(
-        [sys.executable, str(hook)],
+        [sys.executable, *args],
+        cwd=tmp_path,
         input=payload,
         capture_output=True,
         text=True,
@@ -156,14 +157,17 @@ def test_flat_layout_defaults_survive_rules_dir(tmp_path):
     # --rules と --hooks を両方導入すると .claude/rules/ (markdown) が存在する。
     # このディレクトリが default rules dir (.claude/hooks/rules/) を隠蔽して
     # kit デフォルトの git 破壊系ブロックが無効化される回帰を検出する (issue #24)。
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
     result = run_install(tmp_path, "--rules", "--hooks")
     assert result.returncode == 0, result.stderr
     assert (tmp_path / ".claude" / "rules" / "git-workflow.md").exists()
 
-    hook = tmp_path / ".claude" / "hooks" / "hook_pre_commands.py"
+    wiring = json.loads(result.stdout[result.stdout.index("{"):result.stdout.rindex("}") + 1])
+    args = wiring["hooks"]["PreToolUse"][0]["hooks"][0]["args"]
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git reset --hard HEAD~1"}})
     proc = subprocess.run(
-        [sys.executable, str(hook)],
+        [sys.executable, *args],
+        cwd=tmp_path,
         input=payload,
         capture_output=True,
         text=True,

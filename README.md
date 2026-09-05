@@ -38,7 +38,7 @@ cd altairs-agent-dev-kit
 | `--skills` | skills 15 本 → `<repo>/.agents/skills/` (実体) + `<repo>/.claude/skills/` (symlink)。skills.sh CLI 経由、**要 Node.js/npx** |
 | `--rules` | `rules/*.md` → `<repo>/.claude/rules/` |
 | `--agents` | `agents/*.md` → `<repo>/.claude/agents/` |
-| `--hooks` | hooks スクリプト + default rules → `<repo>/.claude/hooks/` |
+| `--hooks` | 版固定した runtime → `<repo>/.agent-kit/runtimes/`、起動設定を生成 |
 | `--codex` | `.codex/config.toml` + `agents/*.toml` |
 | `--all` | 上記すべて |
 | `--force` | 既存ファイルも上書き (`--force` なしは `SKIP (exists)`) |

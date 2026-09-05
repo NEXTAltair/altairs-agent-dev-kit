@@ -59,7 +59,7 @@ cd altairs-agent-dev-kit
 ./install.sh --target /path/to/your-repo --skills           # skills 13本 → <repo>/.claude/skills/ (要 Node.js/npx)
 ./install.sh --target /path/to/your-repo --rules            # rules/*.md → <repo>/.claude/rules/
 ./install.sh --target /path/to/your-repo --agents           # agents/*.md → <repo>/.claude/agents/
-./install.sh --target /path/to/your-repo --hooks            # hooks/scripts + rules/*.default.json → <repo>/.claude/hooks/
+./install.sh --target /path/to/your-repo --hooks            # .agent-kit/runtimes/ + branch lock + 起動設定
 ./install.sh --target /path/to/your-repo --codex            # .codex/config.toml + agents/*.toml
 ./install.sh --target /path/to/your-repo --all --force      # 既存ファイルも上書き (--force なしは SKIP)
 ```
@@ -78,12 +78,13 @@ skills.sh の通常運用と同じ手順で追従アップデートできる。
 `Codex` のみで、裸の `Claude` / `Anthropic` (製品・API への言及) は置換しない。
 `library-research` は WebFetch/WebSearch 前提のため Codex 版を生成しない。
 
-`--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するのみで、
-`<repo>/.claude/settings.json` への自動書き込みはしない。表示される JSON は `hooks/hooks.json`
-(Claude Code プラグイン経路が使う `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/...` 形式) をそのまま
-出すのではなく、install.sh のフラット配置 (`<repo>/.claude/hooks/hook_*.py`、`scripts/` サブ
-ディレクトリなし) に合わせて実パスへ書き換えたものを表示する。表示された JSON を手動で
-`.claude/settings.json` の `hooks` キーへマージすること。
+`--hooks` は内容ハッシュで固定した runtime と `.agent-kit/hooks.lock.json` を作成し、
+Claude の起動設定を標準出力へ表示する。`.claude/settings.json` には自動で書き込まないため、
+表示された JSON を `hooks` キーへマージする。Codex の設定は `.codex/hooks.json` に生成する。
+既存設定は `.new` へ提案し、consumer 固有 override は保持する。
+lock と起動設定を Git 管理し、runtime 配置先は gitignore に追加する。
+plugin 経路も事前に固定 kit から `--runtime-only` で branch lock を作成する。
+旧フラット配置からの移行、固有 hook の接続、復元手順は [Hook runtime 契約](hook-runtime.md) を参照。
 
 ## 2. プロジェクト層 override の書き方
 
