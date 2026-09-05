@@ -3,7 +3,7 @@
 
 スキーマ (ADR: 監査 issue #9 の決定):
 - 必須: name (ディレクトリ名と一致), description
-- 任意: metadata (short-description / origin 等), allowed-tools (重複禁止), dependencies, license
+- 任意: metadata (short-description / origin / dependencies 等), allowed-tools (重複禁止), license
 - 禁止: version (バージョンは .claude-plugin/plugin.json で一元管理), その他の未知キー
 """
 
@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 FORBIDDEN_KEYS = {"version", "keywords"}
-ALLOWED_KEYS = {"name", "description", "metadata", "allowed-tools", "dependencies", "license"}
+ALLOWED_KEYS = {"name", "description", "metadata", "allowed-tools", "license"}
 
 
 def parse_frontmatter(text: str) -> dict[str, str]:

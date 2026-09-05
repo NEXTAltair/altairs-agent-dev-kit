@@ -9,7 +9,7 @@ skill の実体は `skills.sh` (`npx skills`) が管理し、2つの経路で co
 
 | 経路 | 用途 | 実体の入り方 |
 |---|---|---|
-| kit `install.sh --skills` | kit 同梱 skill を一括導入(汎用 consumer) | `.agents/skills/` に実体 + `.claude/skills/` に symlink(canonical レイアウト) |
+| kit `install.sh --skills` | 公開タグの同梱 skill を一括導入 | `.agents/skills/` に実体 + `.claude/skills/` に symlink(canonical レイアウト) |
 | consumer 独自 installer(`skills-lock.json` ベース) | released skill を pin して復元 | 同上。lock の `sourceType` に応じて github/local から復元 |
 
 ### canonical レイアウト
@@ -29,18 +29,32 @@ skill の実体は `skills.sh` (`npx skills`) が管理し、2つの経路で co
 | `github` + `ref` | **released skill**(推奨)。タグに pin して再現性・ポータビリティを担保 | `{ "source": "owner/kit", "ref": "v0.2.2", "sourceType": "github" }` |
 | `local` | consumer 自前 skill、または開発中に kit を手元参照する場合のみ | git 追跡された自前 skill |
 
-> **絶対パスの `local` source は非ポータブル**(別マシン / CI で解決できない)。
+> **絶対パスや consumer 外へ出る相対 `local` source は非ポータブル**(別マシン / CI で解決できない)。
 > released skill は必ず `github@ref` を使う。検出は下記 `check_skills_lock.py`。
+
+## kit 一括導入の更新契約
+
+公開タグを checkout して `install.sh --skills` を実行する。既定 source は GitHub origin とそのタグ。
+タグのない checkout は明示的な `--skill-source` が必要で、ローカル source へ自動 fallback しない。
+skills@1 は ref を clone の branch/tag として使うため、commit SHA の直指定では復元できない。
+
+既存 canonical または Claude 側 skill は `--force` なしでは保持する。lock だけがある新規 checkout
+でも、固定 source/ref と異なる版への置換は拒否する。同じタグから復元するか、意図的な更新に
+`--skills --force` を使い lock 差分をレビューする。kit に含まれない skill には触れない。
+`--force` は kit 所有の同名 skill のローカル編集を置換するため、必要な変更は先に保存する。
+
+未公開の kit を検証する場合のみ `--skill-source /absolute/path/to/kit` を使う。
+この経路の local lock は開発用であり、公開用の GitHub pin へ戻してからコミットする。
 
 ## released kit skill を更新する(github@ref bump)
 
 kit 側で skill を直したものを consumer に反映する正しい手順:
 
-1. **kit**: 編集をコミット → タグを切る → push
+1. **kit**: 専用 worktree で編集・検証し、PR がレビューを通ってマージされた後にリリースタグを公開する
    ```bash
-   git commit -m "..."          # skill の変更
-   git tag -a vX.Y.Z -m "vX.Y.Z"
-   git push origin main && git push origin vX.Y.Z
+   git fetch origin
+   git tag -a vX.Y.Z origin/main -m "vX.Y.Z"
+   git push origin vX.Y.Z
    ```
 2. **consumer**: lock を新タグへ bump(ref と hash を一括更新する。ref だけ手で書き換えると
    独自 installer の drift 検出に弾かれる)
@@ -67,7 +81,7 @@ npx skills add /abs/path/to/kit --skill <name>   # ← やってはいけない
   ```bash
   python scripts/check_skills_lock.py --root .
   ```
-  `skills-lock.json` 内の絶対パス source を検出して非ゼロ終了する。
+  `skills-lock.json` 内の絶対パス、consumer 外の相対 local source、不正な lock 形式を検出して非ゼロ終了する。
 
 ## 関連
 

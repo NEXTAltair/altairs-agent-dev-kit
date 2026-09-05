@@ -3,7 +3,6 @@ name: docs-freshness-audit
 description: "Periodically audit a repository's docs for staleness against the implementation: run a cheap mechanical scan (dead source-path references, dead links, leftover DEPRECATED/TBD banners, doc-vs-code freshness gap, git-invisible ignored leftovers, completed-but-undeleted plan files), then dispatch parallel read-only agents to verify only the suspicious docs against source, and finally propose update / delete / migrate-to-ADR dispositions for user approval. Use on a monthly or quarterly docs review, after large refactors or renames, or when asked whether docs are stale."
 metadata:
   short-description: "docs の陳腐化を機械スキャン→並列実装照合→更新/削除/ADR移送の処遇提案まで定期監査する。"
-dependencies: []
 ---
 
 # Docs Freshness Audit

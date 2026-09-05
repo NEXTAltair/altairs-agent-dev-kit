@@ -50,6 +50,12 @@ Claude Code の `/goal` が代表例。評価器 (既定 Haiku 相当の軽量�
 `/goal` 系コマンドを持つ環境ではその入力文として、持たない環境では自律ループの
 停止条件・Definition of Done・レビュー基準としてそのまま流用する。
 
+PR 保守のような外部状態監視 loop では、完了条件を自然言語の印象ではなく、ツールで観測できる
+state predicates として定義する。例: `gh pr checks` が成功、`isDraft == false`、
+期待する bot review artifact が存在、blocking comment が 0、head SHA が最後に確認した値と一致。
+Codex のように `/goal` primitive を前提にしない環境では、この predicate 群を inline polling loop の
+停止条件として扱う。
+
 ### 3. Human-reviewed loop — 人間が達成を確認する
 
 条件文はレビュー基準として使う。人間が観測できるなら output-only 制約は緩めてよいが、

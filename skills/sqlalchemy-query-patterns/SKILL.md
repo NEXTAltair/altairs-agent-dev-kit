@@ -10,7 +10,6 @@ allowed-tools:
   - Write
   - Edit
   - Bash
-dependencies: []
 ---
 
 # SQLAlchemy Efficient Query Patterns

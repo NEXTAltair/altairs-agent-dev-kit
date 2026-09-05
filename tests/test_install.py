@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -74,7 +75,7 @@ def test_install_skills_canonical_layout(tmp_path):
     #   .claude/skills/<name>  = ../../.agents/skills/<name> への symlink (Claude Code 用)
     # これは validate_harness 等が期待する構成 (.claude/skills は symlink) と一致する。
     result = subprocess.run(
-        ["bash", str(KIT / "install.sh"), "--target", str(tmp_path), "--skills"],
+        ["bash", str(KIT / "install.sh"), "--target", str(tmp_path), "--skills", "--skill-source", str(KIT)],
         capture_output=True, text=True, timeout=180,
     )
     assert result.returncode == 0, result.stderr
@@ -91,6 +92,54 @@ def test_install_skills_canonical_layout(tmp_path):
         assert link.resolve() == skill_dir.resolve(), f"{link} は {skill_dir} を指すべき"
         assert (link / "SKILL.md").exists(), "symlink 越しに SKILL.md が解決するべき"
 
+    # Restore an installer-owned dangling link without --force.
+    shutil.rmtree(agents_skills / "check-existing")
+    restored = subprocess.run(result.args, capture_output=True, text=True, timeout=180)
+    assert restored.returncode == 0, restored.stderr
+    assert (claude_skills / "check-existing/SKILL.md").is_file()
+
+    protected = agents_skills / "check-existing/SKILL.md"
+    original = protected.read_text(encoding="utf-8")
+    protected.write_text(original + "\nLOCAL_EDIT_SENTINEL\n", encoding="utf-8")
+    own = agents_skills / "consumer-own"
+    own.mkdir()
+    (own / "SKILL.md").write_text("canonical consumer skill", encoding="utf-8")
+    own_claude = claude_skills / "consumer-own"
+    own_claude.mkdir()
+    (own_claude / "SKILL.md").write_text("independent consumer skill", encoding="utf-8")
+    lock_path = tmp_path / "skills-lock.json"
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    lock["skills"]["check-existing"].update(sourceType="github", source="owner/pinned", ref="v1")
+    lock_path.write_text(json.dumps(lock), encoding="utf-8")
+    before_lock = lock_path.read_bytes()
+    # A retry repairs links even when canonical content has local edits and a different pin.
+    (claude_skills / "check-existing").unlink()
+    again = subprocess.run(result.args, capture_output=True, text=True, timeout=180)
+    assert again.returncode == 0, again.stderr
+    assert "LOCAL_EDIT_SENTINEL" in protected.read_text(encoding="utf-8")
+    assert lock_path.read_bytes() == before_lock
+    assert (claude_skills / "check-existing").resolve() == agents_skills / "check-existing"
+    assert (claude_skills / "check-existing/SKILL.md").is_file()
+    assert not own_claude.is_symlink()
+    assert (own_claude / "SKILL.md").read_text(encoding="utf-8") == "independent consumer skill"
+    # A fresh checkout may have only a tracked pin, with both skill locations absent.
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    lock["skills"]["check-existing"].update(sourceType="github", source="owner/pinned", ref="v1")
+    lock_path.write_text(json.dumps(lock), encoding="utf-8")
+    pinned = lock_path.read_bytes()
+    (claude_skills / "check-existing").unlink()
+    shutil.rmtree(agents_skills / "check-existing")
+    refused = subprocess.run(result.args, capture_output=True, text=True, timeout=180)
+    assert refused.returncode != 0
+    assert "pin" in refused.stderr
+    assert lock_path.read_bytes() == pinned
+    assert not (agents_skills / "check-existing").exists()
+    forced = subprocess.run([*result.args, "--force"], capture_output=True, text=True, timeout=180)
+    assert forced.returncode == 0, forced.stderr
+    assert protected.read_text(encoding="utf-8") == original
+    assert not own_claude.is_symlink()
+    assert (own_claude / "SKILL.md").read_text(encoding="utf-8") == "independent consumer skill"
+
 
 def test_existing_file_not_overwritten(tmp_path):
     rules = tmp_path / ".claude" / "rules"
@@ -100,6 +149,102 @@ def test_existing_file_not_overwritten(tmp_path):
     assert result.returncode == 0
     assert (rules / "git-workflow.md").read_text(encoding="utf-8") == "custom"
     assert "SKIP" in result.stdout
+
+
+@pytest.mark.parametrize("origin", ["https://github.com/example/kit.git", "git@github.com:example/kit.git"])
+def test_skill_source_defaults_to_exact_release_tag(tmp_path, monkeypatch, origin):
+    kit = tmp_path / "source"
+    kit.mkdir()
+    shutil.copyfile(KIT / "install.sh", kit / "install.sh")
+    for name in ("one", "two"):
+        skill = kit / "skills" / name
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text(f"---\nname: {name}\ndescription: test\n---\n", encoding="utf-8")
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(kit), *args], check=True, capture_output=True)
+
+    git("init")
+    git("add", ".")
+    git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "release")
+    git("remote", "add", "origin", origin)
+    git("tag", "v9.8.7")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    npx = bin_dir / "npx"
+    npx.write_text(
+        "#!/usr/bin/env python3\nimport json,os,sys\nfrom pathlib import Path\n"
+        "if os.environ.get('FAKE_NPX_FAIL'): sys.exit('source unavailable')\n"
+        "args=sys.argv[1:]\nPath('npx-call.json').write_text(json.dumps(args))\n"
+        "for name in args[args.index('--skill')+1:args.index('--agent')]:\n"
+        " p=Path('.agents/skills')/name\n p.mkdir(parents=True)\n (p/'SKILL.md').write_text(name)\n",
+        encoding="utf-8",
+    )
+    npx.chmod(0o755)
+    monkeypatch.setenv("PATH", str(bin_dir) + os.pathsep + os.environ["PATH"])
+    target = tmp_path / "target"
+    target.mkdir()
+    result = subprocess.run(
+        ["bash", str(kit / "install.sh"), "--target", str(target), "--skills"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    args = json.loads((target / "npx-call.json").read_text())
+    assert args[args.index("add") + 1] == "github:example/kit#v9.8.7"
+    assert args[args.index("--skill") + 1:args.index("--agent")] == ["one", "two"]
+    # Tags need not be valid --branch shorthand (e.g. HEAD or leading hyphen).
+    for ref in ("HEAD", "-release"):
+        tagged_target = tmp_path / f"tag-{ref}"
+        tagged_target.mkdir()
+        tagged = subprocess.run(
+            ["bash", str(kit / "install.sh"), "--target", str(tagged_target), "--skills",
+             "--skill-source", f"github:example/kit#{ref}"],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert tagged.returncode == 0, tagged.stderr
+        call = json.loads((tagged_target / "npx-call.json").read_text())
+        assert call[call.index("add") + 1] == f"github:example/kit#{ref}"
+    # Untagged source must not silently become a local/unpinned dependency.
+    git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "unreleased")
+    unpublished = tmp_path / "unpublished"
+    unpublished.mkdir()
+    (kit / "rules").mkdir()
+    (kit / "rules/test.md").write_text("replacement")
+    existing = unpublished / ".claude/rules/test.md"
+    existing.parent.mkdir(parents=True)
+    existing.write_text("consumer rule")
+    result = subprocess.run(
+        ["bash", str(kit / "install.sh"), "--target", str(unpublished), "--all", "--force"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode != 0
+    assert "--skill-source" in result.stderr
+    assert not (unpublished / "npx-call.json").exists()
+    assert existing.read_text() == "consumer rule"
+    assert not (unpublished / ".agent-kit").exists()
+    assert not (unpublished / ".codex").exists()
+    # An invalid explicit override must fail at the same preflight boundary.
+    for bad_source in (str(tmp_path / "missing"), "github:example/kit", "https://bad.invalid/kit", "github:example/kit#bad~ref") :
+        invalid = subprocess.run(
+            [*result.args, "--skill-source", bad_source],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert invalid.returncode != 0
+        assert "--skill-source" in invalid.stderr
+        assert existing.read_text() == "consumer rule"
+        assert not (unpublished / ".agent-kit").exists()
+        assert not (unpublished / ".codex").exists()
+        assert not (unpublished / "npx-call.json").exists()
+    monkeypatch.setenv("FAKE_NPX_FAIL", "1")
+    unavailable = subprocess.run(
+        [*result.args, "--skill-source", "github:example/kit#valid-but-unavailable"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert unavailable.returncode != 0
+    assert "source unavailable" in unavailable.stderr
+    assert existing.read_text() == "consumer rule"
+    assert not (unpublished / ".agent-kit").exists()
+    assert not (unpublished / ".codex").exists()
 
 
 def test_empty_source_glob_does_not_crash(tmp_path):

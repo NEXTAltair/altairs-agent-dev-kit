@@ -29,18 +29,31 @@ claude plugin install altairs-agent-dev-kit@altairs-agent-dev-kit
 (`.claude-plugin/plugin.json` の auto-discovery。`skills` / `agents` / `hooks` フィールドを
 明示していないのはデフォルト検出パスと完全一致するため二重指定を避けた設計)。
 
+hook を使うプロジェクトは Git repository が前提で、利用する kit 版の branch lock を事前に作成する。
+別途 clone した kit で `git checkout v0.3.0` を実行し、次を実行する (Linux は `python3`):
+
+```text
+python -X utf8 scripts/install_harness.py --target <project-directory> --runtime-only
+```
+
+`.agent-kit/hooks.lock.json` を Git 管理し、runtime ディレクトリは ignore する。
+plugin の `python_command` は Linux では既定の `python3`、Windows では `python` または
+Python executable の絶対パスを設定する。hook は作業中 Git checkout 内で起動する。
+plugin 更新でソースが変わっても branch pin は維持される。版更新・復元手順は
+[runtime 契約](hook-runtime.md) を参照。plugin とプロジェクト設定で同じ hook を二重登録しない。
+
 ### 経路B: skills.sh (`npx skills add`) — skill 単体導入
 
 skill を 1 本ずつ選んで導入したい場合:
 
 ```bash
-npx skills add github:NEXTAltair/altairs-agent-dev-kit --skill check-existing
-npx skills add github:NEXTAltair/altairs-agent-dev-kit --skill pr-maintainer
-npx skills add github:NEXTAltair/altairs-agent-dev-kit --skill okf-bundle
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.0" --skill check-existing
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.0" --skill pr-maintainer
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.0" --skill okf-bundle
 ```
 
 `skills/<name>/SKILL.md` が skills.sh の標準配置と一致しているため、任意の skill 名を
-`--skill` に指定できる。同梱 skill 一覧は `skills/` 配下のディレクトリ名 (13 本) を参照。
+`--skill` に指定できる。同梱 skill 一覧は `skills/` 配下のディレクトリ名を参照。
 
 ### 経路C: install.sh — kit 全体を repo に導入する推奨経路
 
@@ -50,27 +63,32 @@ skills / rules / agents / hooks / Codex 設定をこれ 1 本で導入できる�
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
+git checkout v0.3.0
 ./install.sh --target /path/to/your-repo --all
 ```
 
 個別フラグでの選択導入も可能 (`install.sh` の実引数):
 
 ```bash
-./install.sh --target /path/to/your-repo --skills           # skills 13本 → <repo>/.claude/skills/ (要 Node.js/npx)
+./install.sh --target /path/to/your-repo --skills           # canonical 実体 + Claude symlink (要 Node.js/npx)
 ./install.sh --target /path/to/your-repo --rules            # rules/*.md → <repo>/.claude/rules/
 ./install.sh --target /path/to/your-repo --agents           # agents/*.md → <repo>/.claude/agents/
 ./install.sh --target /path/to/your-repo --hooks            # .agent-kit/runtimes/ + branch lock + 起動設定
 ./install.sh --target /path/to/your-repo --codex            # .codex/config.toml + agents/*.toml
-./install.sh --target /path/to/your-repo --all --force      # 既存ファイルも上書き (--force なしは SKIP)
+./install.sh --target /path/to/your-repo --all --force      # kit 所有物を意図的に更新
 ```
 
-`--skills` は skills.sh CLI (`npx skills add`) に委譲する非対話実行で、kit checkout
-(`$KIT_DIR`) をソースに全 skill を `<repo>/.claude/skills/` へコピーする
-(`--copy` 指定、node_modules へのシンボリックリンクにはしない)。npx は初回実行時に CLI
-本体を自動取得するため事前の `npm install -g` は不要だが、**Node.js (npx コマンド) 自体は
-必須**。npx が見つからない環境では `--skills` は何もコピーせず、エラーメッセージ付きで
-exit 1 する (黙ったフォールバックはしない)。導入後に `npx skills update` を実行すれば
-skills.sh の通常運用と同じ手順で追従アップデートできる。
+`--skills` は skills.sh CLI (`npx skills@1 add`) に委譲する。既定の導入元は GitHub origin と
+checkout 中の公開タグであり、`skills-lock.json` に GitHub source/ref を記録する。
+実体は `.agents/skills/`、Claude 用の参照は `.claude/skills/` の相対 symlink。
+symlink 非対応環境では Claude 側をコピーする。
+既存の canonical または Claude 側 skill は `--force` なしでは保持する。kit 外の skill は更新しない。
+ディレクトリが無く lock だけ残る場合も、固定版と異なる source への置換は拒否する。
+
+**Node.js / npx が必要**で、npx は CLI 本体を初回に取得する。タグのない開発 checkout を試す場合だけ
+`--skill-source /absolute/path/to/kit` を指定する。ローカル source の lock は配布用にコミットしない。
+公開版の更新は新タグを checkout して `--skills --force` を実行し、lock 差分をレビューする。
+詳しくは [skill 導入・更新 runbook](skill-install-runbook.md) を参照。
 
 `--codex` が配布する `codex/agents/*.toml` は `agents/*.md` からの**生成物**であり、手編集
 しない。`agents/*.md` を変更したら `uv run python scripts/generate_codex_agents.py` で再生成
@@ -171,7 +189,7 @@ kit デフォルトは `ng_words: []` (無効)。NG ワードはプロジェク�
 
 ## 3. rules の追記ポイント
 
-`rules/*.md` (9 本) は汎用原則のみを記載しており、具体パス・具体コマンド・Issue 番号などの
+`rules/*.md` は汎用原則のみを記載しており、具体パス・具体コマンド・Issue 番号などの
 プロジェクト固有値は意図的に含めていない。導入後は各 rule 内の「プロジェクト固有」に関する
 記述箇所 (共有 venv の絶対パス、CI filter 表、submodule 運用、ブランチ命名規則など) に、
 自分のリポジトリの具体値を追記すること。rules 本文の原則・判断フロー自体は変更不要。

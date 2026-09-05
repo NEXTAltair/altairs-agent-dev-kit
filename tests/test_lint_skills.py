@@ -81,6 +81,6 @@ def test_optional_keys_allowed(tmp_path):
     d.mkdir()
     (d / "SKILL.md").write_text(
         "---\nname: full-skill\ndescription: x\nlicense: Apache-2.0\n"
-        "metadata:\n  short-description: 短い説明\ndependencies: []\n---\n本文",
+        "metadata:\n  short-description: 短い説明\n  dependencies: helper\n---\n本文",
         encoding="utf-8")
     assert run(tmp_path).returncode == 0
