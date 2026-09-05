@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python",
+            "command": "${user_config.python_command}",
             "args": [
               "-X",
               "utf8",
@@ -16,7 +16,7 @@
           },
           {
             "type": "command",
-            "command": "python",
+            "command": "${user_config.python_command}",
             "args": [
               "-X",
               "utf8",
@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python",
+            "command": "${user_config.python_command}",
             "args": [
               "-X",
               "utf8",
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python",
+            "command": "${user_config.python_command}",
             "args": [
               "-X",
               "utf8",
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python",
+            "command": "${user_config.python_command}",
             "args": [
               "-X",
               "utf8",

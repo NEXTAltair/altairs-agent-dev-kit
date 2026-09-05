@@ -3,7 +3,7 @@
 Common hook policy belongs to this kit. Consuming repositories keep their own
 override JSON and event registrations, not independent copies maintained by hand.
 
-The plugin template uses Claude exec-form commands (`python`, `args`) and native
+The plugin template uses Claude exec-form commands (`command`, `args`) and native
 timeout fields. Installed project registrations resolve the active Git root and
 fall back to the main checkout's runtime when a new linked worktree has no installed
 hooks. Policy overrides still come from the active checkout. Explicit UTF-8 handles
@@ -18,8 +18,10 @@ Continue creating Codex worktrees through Git/agent workflows.
 Generated project registrations use `python` on Windows and `python3` on Linux.
 Regenerate these registrations when moving to a different OS. A shared project
 may explicitly use `python` on both if both environments provide that alias.
-The plugin template uses `python` on PATH on both OSes: on Debian/Ubuntu install
-the `python-is-python3` package, or use the project installer instead of the plugin.
+The plugin's `python_command` user configuration defaults to `python3` for Linux.
+On Windows, configure it as `python` or an absolute Python executable path when
+enabling the plugin. Claude substitutes this setting directly into the exec command;
+no shell wrapper or optional Linux `python` alias is required.
 Git is also required.
 Neither hook startup nor installation syncs the application's virtual environment.
 `--codex` also renders a local config using the installation target's `.venv`;
@@ -42,4 +44,5 @@ Linux. The existing shell-installer test suite remains Linux-specific.
 Sources:
 
 - https://code.claude.com/docs/en/hooks
+- https://code.claude.com/docs/en/plugins-reference
 - https://learn.chatgpt.com/ja-JP/docs/hooks
