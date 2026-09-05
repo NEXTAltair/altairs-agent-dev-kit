@@ -51,9 +51,11 @@ def test_worktree_provider_uses_shared_root_from_nested_worktree(tmp_path):
     init_repo(root)
     child = root / ".agents/worktree/first"
     git(root, "worktree", "add", "--detach", str(child))
+    git(child, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "child change")
     result = run_hook("hook_worktree_create", {"cwd": str(child), "worktree_name": "second"}, child)
     assert result.returncode == 0, result.stderr
     assert Path(result.stdout.strip()) == root / ".agents/worktree/second"
+    assert git(Path(result.stdout.strip()), "rev-parse", "HEAD").stdout == git(child, "rev-parse", "HEAD").stdout
 
 
 def test_project_override_and_provider_log_directory(tmp_path, monkeypatch):

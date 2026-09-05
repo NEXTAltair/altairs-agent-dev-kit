@@ -54,8 +54,9 @@ def main() -> None:
         sys.stderr.write(f"WorktreeCreate hook: payload 解析失敗: {e}")
         sys.exit(1)
 
-    repo = find_shared_root(Path(data.get("cwd") or find_project_root()))
-    worktree_base = Path(repo) / WORKTREE_SUBDIR
+    repo = Path(data.get("cwd") or find_project_root()).resolve()
+    shared_root = find_shared_root(repo)
+    worktree_base = shared_root / WORKTREE_SUBDIR
     # 現行スキーマは worktree_name。旧 payload 形状 (name) にもフォールバックする。
     worktree_path = worktree_base / _sanitize(data.get("worktree_name") or data.get("name") or "agent")
     source_ref = data.get("source_ref") or "HEAD"
