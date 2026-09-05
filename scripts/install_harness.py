@@ -67,7 +67,8 @@ def codex_wiring() -> dict:
     return {"hooks": events}
 
 
-def install(target: Path, force: bool = False, codex: bool = False) -> dict:
+def install_runtime(target: Path, force: bool = False) -> None:
+    """Restore kit-owned files only, leaving all event registrations untouched."""
     if not target.is_dir():
         raise ValueError("--target must be an existing project directory")
     for source in (KIT / "hooks/scripts").glob("*.py"):
@@ -76,6 +77,10 @@ def install(target: Path, force: bool = False, codex: bool = False) -> dict:
         copy_file(source, target / ".claude/hooks/rules" / source.name, force)
     for source in (KIT / "codex/hooks").glob("*.py"):
         copy_file(source, target / ".codex/hooks" / source.name, force)
+
+
+def install(target: Path, force: bool = False, codex: bool = False) -> dict:
+    install_runtime(target, force)
     write_config(target / ".codex/hooks.json", json.dumps(codex_wiring(), indent=2) + "\n", force)
     if codex:
         # POSIX spelling is also a valid Windows absolute path and avoids TOML escapes.
