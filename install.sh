@@ -88,6 +88,12 @@ if [[ "$DO_SKILLS" -eq 1 ]]; then
         exit 1
       fi
     fi
+    if [[ "$SKILL_SOURCE" == github:* ]]; then
+      git check-ref-format --branch "${SKILL_SOURCE##*#}" >/dev/null 2>&1 || {
+        echo "ERROR: --skill-source の ref は有効な Git branch/tag 名が必要です" >&2
+        exit 1
+      }
+    fi
     if [[ "$FORCE" -eq 0 && -f "$TARGET/skills-lock.json" ]]; then
       # A fresh checkout can retain a pin without its ignored skill directory.
       # Do not silently change that pin just because there is no file to skip.
@@ -115,6 +121,30 @@ PYEOF
   fi
 fi
 
+if [[ "$DO_SKILLS" -eq 1 && ${#selected_skills[@]} -gt 0 ]]; then
+    (cd "$TARGET" && npx --yes skills@1 add "$SKILL_SOURCE" --skill "${selected_skills[@]}" --agent codex -y)
+
+    link_skills+=("${selected_skills[@]}")
+fi
+
+if [[ "$DO_SKILLS" -eq 1 && ${#link_skills[@]} -gt 0 ]]; then
+    # Restore missing links without reinstalling or changing canonical skills/pins.
+    mkdir -p "$TARGET/.claude/skills"
+    for name in "${link_skills[@]}"; do
+      skill_dir="$TARGET/.agents/skills/$name"
+      [[ -f "$skill_dir/SKILL.md" ]] || { echo "ERROR: skill が導入されていません: $name" >&2; exit 1; }
+      link="$TARGET/.claude/skills/$name"
+      [[ -e "$link" || -L "$link" ]] && rm -rf "$link"
+      if ln -s "../../.agents/skills/$name" "$link" 2>/dev/null; then
+        echo "LINK: .claude/skills/$name -> ../../.agents/skills/$name"
+      else
+        cp -r "$skill_dir" "$link"
+        echo "COPY (symlink 非対応環境): .claude/skills/$name"
+      fi
+    done
+fi
+
+# Resolve/install skills before unrelated components, including network/CLI failures.
 if [[ "$DO_RULES" -eq 1 ]]; then
   for f in "$KIT_DIR"/rules/*.md; do copy_file "$f" "$TARGET/.claude/rules/$(basename "$f")"; done
 fi
@@ -137,29 +167,6 @@ sys.path.insert(0, str(Path(sys.argv[1]) / "scripts"))
 from install_harness import install_codex
 install_codex(Path(sys.argv[2]), force=bool(int(sys.argv[3])))
 PYEOF
-fi
-
-if [[ "$DO_SKILLS" -eq 1 && ${#selected_skills[@]} -gt 0 ]]; then
-    (cd "$TARGET" && npx --yes skills@1 add "$SKILL_SOURCE" --skill "${selected_skills[@]}" --agent codex -y)
-
-    link_skills+=("${selected_skills[@]}")
-fi
-
-if [[ "$DO_SKILLS" -eq 1 && ${#link_skills[@]} -gt 0 ]]; then
-    # Restore missing links without reinstalling or changing canonical skills/pins.
-    mkdir -p "$TARGET/.claude/skills"
-    for name in "${link_skills[@]}"; do
-      skill_dir="$TARGET/.agents/skills/$name"
-      [[ -f "$skill_dir/SKILL.md" ]] || { echo "ERROR: skill が導入されていません: $name" >&2; exit 1; }
-      link="$TARGET/.claude/skills/$name"
-      [[ -e "$link" || -L "$link" ]] && rm -rf "$link"
-      if ln -s "../../.agents/skills/$name" "$link" 2>/dev/null; then
-        echo "LINK: .claude/skills/$name -> ../../.agents/skills/$name"
-      else
-        cp -r "$skill_dir" "$link"
-        echo "COPY (symlink 非対応環境): .claude/skills/$name"
-      fi
-    done
 fi
 
 echo "DONE"

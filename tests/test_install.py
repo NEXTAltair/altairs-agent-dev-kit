@@ -173,7 +173,8 @@ def test_skill_source_defaults_to_exact_release_tag(tmp_path, monkeypatch, origi
     bin_dir.mkdir()
     npx = bin_dir / "npx"
     npx.write_text(
-        "#!/usr/bin/env python3\nimport json,sys\nfrom pathlib import Path\n"
+        "#!/usr/bin/env python3\nimport json,os,sys\nfrom pathlib import Path\n"
+        "if os.environ.get('FAKE_NPX_FAIL'): sys.exit('source unavailable')\n"
         "args=sys.argv[1:]\nPath('npx-call.json').write_text(json.dumps(args))\n"
         "for name in args[args.index('--skill')+1:args.index('--agent')]:\n"
         " p=Path('.agents/skills')/name\n p.mkdir(parents=True)\n (p/'SKILL.md').write_text(name)\n",
@@ -211,7 +212,7 @@ def test_skill_source_defaults_to_exact_release_tag(tmp_path, monkeypatch, origi
     assert not (unpublished / ".agent-kit").exists()
     assert not (unpublished / ".codex").exists()
     # An invalid explicit override must fail at the same preflight boundary.
-    for bad_source in (str(tmp_path / "missing"), "github:example/kit", "https://bad.invalid/kit"):
+    for bad_source in (str(tmp_path / "missing"), "github:example/kit", "https://bad.invalid/kit", "github:example/kit#bad~ref") :
         invalid = subprocess.run(
             [*result.args, "--skill-source", bad_source],
             capture_output=True, text=True, timeout=30,
@@ -222,6 +223,16 @@ def test_skill_source_defaults_to_exact_release_tag(tmp_path, monkeypatch, origi
         assert not (unpublished / ".agent-kit").exists()
         assert not (unpublished / ".codex").exists()
         assert not (unpublished / "npx-call.json").exists()
+    monkeypatch.setenv("FAKE_NPX_FAIL", "1")
+    unavailable = subprocess.run(
+        [*result.args, "--skill-source", "github:example/kit#valid-but-unavailable"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert unavailable.returncode != 0
+    assert "source unavailable" in unavailable.stderr
+    assert existing.read_text() == "consumer rule"
+    assert not (unpublished / ".agent-kit").exists()
+    assert not (unpublished / ".codex").exists()
 
 
 def test_empty_source_glob_does_not_crash(tmp_path):
