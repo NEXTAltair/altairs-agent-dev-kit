@@ -48,11 +48,13 @@ git checkout v0.3.0
 `--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するだけなので、
 表示された JSON を `<repo>/.claude/settings.json` の `hooks` キーへ手動で貼り付けること。
 
-Windows / Linux 共通のフック導入には次も利用できる (Python 3.10+ と Git が必要):
+Windows PowerShell のフック導入には次を利用できる (Python 3.10+ と Git が必要):
 
 ```text
 python -X utf8 scripts/install_harness.py --target <project-directory> --codex
 ```
+
+Linux では同じコマンドの `python` を `python3` に置き換える。
 
 branch lock と共通ランタイムを導入し、Codex の `hooks.json` を生成する。
 既存設定は `.new` に提案を保存し、プロジェクトの override JSON は変更しない。
@@ -74,15 +76,17 @@ Codex ではプロジェクトと生成フックをレビューし、`/hooks` �
 kit 同梱の hook デフォルトはほとんどのゲートが無効 (空リスト) になっている。
 有効化したいものだけ `<repo>/.claude/hooks/rules/*.json` に override を置く:
 
+`.claude/hooks/rules/consistency.json`:
+
 ```json
-// .claude/hooks/rules/consistency.json
 {
   "required_env": ["UV_PROJECT_ENVIRONMENT"]
 }
 ```
 
+`.claude/hooks/rules/response_monitor.json`:
+
 ```json
-// .claude/hooks/rules/response_monitor.json
 {
   "ng_words": [
     {"keyword": "だろう", "message": "推測は禁止。確認した？テストした？"}
