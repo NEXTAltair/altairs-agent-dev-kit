@@ -3,9 +3,7 @@ name: pr-autoloop
 description: "Run PR maintenance to completion automatically after an agent creates a PR or a draft PR becomes ready for review: keep polling CI and bot review with gh, repair failures and reply in Japanese in the same worktree, escalate design loops, and squash merge when safe, without waiting for a human to restart each poll cycle. Use right after an agent-created PR exists or transitions draft-to-ready. Do NOT use for human-authored PRs, and do NOT redefine repair/merge/escalation policy here (that lives in pr-maintainer)."
 metadata:
   short-description: "PR作成後の保守ループを人手の再起動なしに最後まで自走させる共通スキル。作法差分はCLAUDE.md/AGENTS.mdで吸収。"
-dependencies:
-  - pr-maintainer
-  - github-ops
+  dependencies: "pr-maintainer, github-ops"
 ---
 
 # PR Autoloop
@@ -13,6 +11,11 @@ dependencies:
 Automatically drive the agent PR maintenance loop to a terminal state after a PR is created, without a
 human restarting each poll. This skill is shared by Codex and Claude Code; only the non-blocking wait
 mechanism differs per agent and is absorbed by each agent guide (see "Per-Agent Wait Mechanism").
+
+This is a **bounded time-based loop with goal-based stop conditions**. It polls an external system
+(GitHub PR state) on an interval, reacts to changed CI/review/mergeability state, and stops only on
+merge, escalation, or timeout. Do not use it as a generic autonomous coding loop; it exists for the
+well-defined PR maintenance workflow.
 
 ## Relationship to pr-maintainer
 
@@ -53,10 +56,10 @@ Treat maintenance as a self-paced poll loop. One loop cycle:
      --json name,state,bucket,link,startedAt,completedAt,workflow
 
    # (c) Bot reactions on the PR issue (Codex signals: +1=clean, eyes=in-progress)
-   gh api "repos/$REPO/issues/$PR_NUM/reactions"
+   gh api --paginate "repos/$REPO/issues/$PR_NUM/reactions?per_page=100"
 
    # (d) Inline review comments — detect P1/P2 badge findings from Codex
-   gh api "repos/$REPO/pulls/$PR_NUM/comments"
+   gh api --paginate "repos/$REPO/pulls/$PR_NUM/comments?per_page=100"
    ```
 
    `$REPO` is `owner/repo` (e.g. `your-org/your-repo`).
@@ -77,6 +80,11 @@ Treat maintenance as a self-paced poll loop. One loop cycle:
    - **timeout** — total elapsed reached the polling window with no terminal result → comment in Japanese that CI/review did not complete in the window, stop.
 3. If the outcome is **continue**, wait the poll interval and start the next cycle automatically.
 
+The stop condition is not a prose judgment such as "the PR looks good". It is the conjunction of
+observable predicates gathered through `gh`: CI is green, the PR is not draft, the expected bot review
+artifact exists, no blocking findings remain, merge preconditions are clean, and the checked head SHA is
+still current.
+
 ### Loop parameters
 
 - Poll interval: about **3 minutes** between cycles.
@@ -91,7 +99,8 @@ The only agent-specific part is **how you wait the poll interval without blockin
 hardcode a single mechanism here; follow your agent guide:
 
 - **Claude Code** → ScheduleWakeup self-pacing; fallback bounded `bash until` loop; never `sleep && <next>`.
-- **Codex** → inline session polling (no ScheduleWakeup).
+- **Codex** → inline session polling (no ScheduleWakeup). Keep the loop inside the active session and
+  report the terminal state instead of relying on a platform routine to wake the agent later.
 
 導入先の `CLAUDE.md` / `AGENTS.md` に wait 機構のセクション (例: "pr-autoloop 実装") があれば
 それを優先する。無ければ上のデフォルトに従い、どの機構を使ったか報告する。

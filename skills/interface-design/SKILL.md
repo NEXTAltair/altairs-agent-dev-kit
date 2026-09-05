@@ -11,7 +11,6 @@ allowed-tools:
   - Write
   - Edit
   - AskUserQuestion
-dependencies: []
 ---
 
 # Interface Design

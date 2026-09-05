@@ -17,8 +17,8 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 
 | 種別 | 数 | 場所 |
 |---|---|---|
-| skills | 15 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
-| rules | 9 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守等) |
+| skills | 14 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
+| rules | 10 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守等) |
 | hooks | 5 本 + 共通基盤 | `hooks/scripts/*.py` (+ `hook_common.py`)、設定は `hooks/rules/*.default.json` |
 | agents | 10 本 | `agents/*.md` (Claude Code サブエージェント定義) |
 | Codex 設定 | 一式 | `codex/config.toml.template`, `codex/agents/*.toml` |
@@ -30,18 +30,20 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
+git checkout v0.3.0
 ./install.sh --target /path/to/your-repo --all
 ```
 
 | フラグ | 導入内容 |
 |---|---|
-| `--skills` | skills 15 本 → `<repo>/.agents/skills/` (実体) + `<repo>/.claude/skills/` (symlink)。skills.sh CLI 経由、**要 Node.js/npx** |
+| `--skills` | 同梱 skills → `<repo>/.agents/skills/` (実体) + `<repo>/.claude/skills/` (symlink)。skills.sh CLI 経由、**要 Node.js/npx** |
 | `--rules` | `rules/*.md` → `<repo>/.claude/rules/` |
 | `--agents` | `agents/*.md` → `<repo>/.claude/agents/` |
 | `--hooks` | 版固定した runtime → `<repo>/.agent-kit/runtimes/`、起動設定を生成 |
 | `--codex` | `.codex/config.toml` + `agents/*.toml` |
 | `--all` | 上記すべて |
-| `--force` | 既存ファイルも上書き (`--force` なしは `SKIP (exists)`) |
+| `--force` | kit 所有ファイル・skill の意図的な更新。runtime は別版を追加して branch pin を変更 |
+| `--skill-source` | skill の導入元を明示。既定は checkout 中の公開 GitHub タグ。ローカルパスは開発時のみ |
 
 `--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するだけなので、
 表示された JSON を `<repo>/.claude/settings.json` の `hooks` キーへ手動で貼り付けること。
@@ -52,12 +54,17 @@ Windows / Linux 共通のフック導入には次も利用できる (Python 3.10
 python -X utf8 scripts/install_harness.py --target <project-directory> --codex
 ```
 
-Claude の共通ランタイムと Codex adapter を導入し、Codex の `hooks.json` を生成する。
+branch lock と共通ランタイムを導入し、Codex の `hooks.json` を生成する。
 既存設定は `.new` に提案を保存し、プロジェクトの override JSON は変更しない。
-既存ランタイムを更新するときだけ `--force` を指定する。Claude 配線は表示された JSON を
+既存版から意図的に更新するときだけ `--force` を指定する。Claude 配線は表示された JSON を
 既存の設定へマージする。`install.sh --hooks` も同じ処理を利用する。
 OS 固有の共有環境パスはローカルの Codex 設定で管理し、Windows とコンテナで共有しない。
 詳細は [docs/portable-hooks.md](docs/portable-hooks.md) を参照。
+
+lock と起動設定を Git 管理し、`.agent-kit/runtimes/` と `.agent-kit/.pin-update` は gitignore に
+追加する。新規 checkout の復元には固定した kit から `--runtime-only` を使う。
+Codex ではプロジェクトと生成フックをレビューし、`/hooks` で信頼を確認する。
+導入・更新・復元・失敗時の手順は [runtime 契約](docs/hook-runtime.md) を参照。
 
 その他の導入経路 (Claude Code プラグイン / skills.sh 単体) は
 [docs/adoption.md](docs/adoption.md) を参照。
@@ -95,6 +102,7 @@ NG ワード例、rules の追記ポイント、`check_config_consistency.py` �
 3. **frontmatter = SSoT、索引は生成物**: メタデータは frontmatter に一本化し、索引の手編集を禁止する
 4. **コマンド形状を変えず環境で設定する**: CLI の承認摩擦を避けるため、env prefix を毎回付けず設定ファイルに1回常設する
 5. **設定と文書の整合を lint する**: 「rules が約束する env/hook 配線が settings に実在するか」を検証するチェックを提供する
+6. **unknowns を分類する**: 未確定の前提を inspect / test / ask / assume / defer で扱い、未検証の仮定を成果報告に残す
 
 ## ドキュメント
 
