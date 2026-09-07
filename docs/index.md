@@ -8,6 +8,7 @@
 * [ADR-0006: skill 導入を canonical レイアウト(.agents/skills 実体 + .claude/skills symlink)に統一する](decisions/0006-canonical-skill-install-layout.md) — install.sh --skills が .claude/skills に実体を置く単一 agent レイアウトを、.agents/skills 実体 + .claude/skills symlink の canonical レイアウトに変更し、skills.sh 既定および検証の期待と一致させる
 * [ADR-0007: unknowns discovery を汎用ルールとして追加する](decisions/0007-add-unknowns-discovery-rule.md) — AI エージェントがプロンプト・計画・ルールに書かれていない前提を推測で埋める問題を、Fable 固有の skill ではなく作業横断の unknowns discovery ルールとして扱う
 * [ADR-0008: PR autoloop は bounded time-based loop として扱い hook は adapter 分離する](decisions/0008-loop-contracts-and-hook-adapters.md) — PR 保守 loop の観測可能な停止条件と、provider 別の起動設定・共有 policy・branch 固定 runtime の責務を定義する
+* [ADR-0009: submodule 内の cwd は所有 checkout に解決し、起動失敗時も単独の cd は拒否しない](decisions/0009-submodule-cwd-and-bare-cd-escape.md) — submodule を固定する checkout を superproject 経由で辿って hook を継続し、入れ子 repository で runtime 解決に失敗しても単独の cd だけは通してエージェントが自力で脱出できるようにする
 * [altairs-agent-dev-kit 設計書](superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — LoRAIro の開発標準を汎用化し独立リポジトリとして配布するための設計方針
 * [altairs-agent-dev-kit Implementation Plan](superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — skills / rules / hooks / agents / Codex 設定を汎用化し3経路で導入できる kit を構築する実装計画
 * [docs-freshness-audit skill 設計](superpowers/specs/2026-07-05-docs-freshness-audit-skill-design.md)

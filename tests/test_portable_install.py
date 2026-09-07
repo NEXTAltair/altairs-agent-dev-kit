@@ -427,3 +427,85 @@ def test_codex_worktree_config_uses_shared_environment(tmp_path):
         )
         assert result.returncode == 0, result.stderr
         assert result.stdout == "", result.stdout
+
+
+def _git(cwd, *arguments):
+    subprocess.run(
+        ["git", "-C", str(cwd), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+         "-c", "protocol.file.allow=always", *arguments],
+        check=True, capture_output=True, text=True, encoding="utf-8", timeout=30,
+    )
+
+
+def _launch(script, event, cwd, payload, consumer=False):
+    from install_harness import hook_bootstrap
+    return subprocess.run(
+        [sys.executable, "-X", "utf8", "-c", hook_bootstrap(script, event=event, consumer=consumer)],
+        input=payload, cwd=cwd, capture_output=True, text=True, encoding="utf-8", timeout=20,
+    )
+
+
+def test_submodule_cwd_resolves_owning_checkout(tmp_path):
+    """A submodule is part of the checkout that pins it; hooks keep working from inside it."""
+    from install_harness import install_runtime
+    target = tmp_path / "super 日本語"
+    target.mkdir()
+    _git(tmp_path, "init", "-q", str(target))
+    install_runtime(target)
+    consumer = target / ".claude/hooks/teammate.py"
+    consumer.parent.mkdir(parents=True)
+    consumer.write_text("from hook_common import find_project_root\nprint(find_project_root())\n", encoding="utf-8")
+    library = tmp_path / "library"
+    _git(tmp_path, "init", "-q", str(library))
+    _git(library, "commit", "--allow-empty", "-m", "library")
+    _git(target, "submodule", "add", "-q", library.as_uri(), "local_packages/library")
+    _git(target, "add", "-A")
+    _git(target, "commit", "-q", "-m", "pin")
+    inside = target / "local_packages/library"
+    blocked = '{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}'
+
+    result = _launch("hook_pre_commands.py", "PreToolUse", inside, blocked)
+    assert result.returncode == 0, result.stderr
+    assert "runtime unavailable" not in result.stderr
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    result = _launch(".claude/hooks/teammate.py", "TeammateIdle", inside, "{}", consumer=True)
+    assert result.returncode == 0, result.stderr
+    assert Path(result.stdout.strip()) == target.resolve()
+
+    # A submodule initialised inside a linked worktree belongs to that worktree, not to main.
+    worktree = target / ".agents/worktree/feature"
+    _git(target, "worktree", "add", "--detach", str(worktree))
+    _git(worktree, "submodule", "update", "--init", "-q")
+    result = _launch(".claude/hooks/teammate.py", "TeammateIdle", worktree / "local_packages/library", "{}",
+                     consumer=True)
+    assert result.returncode == 0, result.stderr
+    assert Path(result.stdout.strip()) == worktree.resolve()
+
+
+def test_nested_repository_stays_unsupported_but_permits_bare_cd(tmp_path):
+    """An unrelated repository nested in the checkout never borrows its policy, yet cwd can be repaired."""
+    from install_harness import install_runtime
+    target = tmp_path / "project"
+    target.mkdir()
+    _git(tmp_path, "init", "-q", str(target))
+    install_runtime(target)
+    vendored = target / "vendored-kit"
+    _git(target, "init", "-q", str(vendored))
+    blocked = '{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}'
+
+    result = _launch("hook_pre_commands.py", "PreToolUse", vendored, blocked)
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "hooks.lock.json" in result.stderr and str(vendored.resolve()) in result.stderr
+    for command in ("cd " + str(target), 'cd "%s"' % target, "cd ..", "cd"):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+        result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == "", command
+        assert "runtime unavailable" in result.stderr
+    for command in ("cd .. && rm -rf x", "cd ..; ls", "cd $(pwd)", "cd `pwd`", "cd .. | cat"):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+        result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
+        assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny", command
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target / "x"), "content": "cd"}})
+    result = _launch("hook_pre_edit_worktree.py", "PreToolUse", vendored, payload)
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
