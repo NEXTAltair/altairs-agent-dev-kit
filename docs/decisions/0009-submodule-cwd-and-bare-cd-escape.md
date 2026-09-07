@@ -3,7 +3,7 @@ type: Decision
 title: "ADR-0009: submodule の中にいても hook を動かし、動かせない場所からは cd で戻れるようにする"
 description: submodule に cd しただけで全ツールが拒否され、戻る cd まで拒否されて詰む問題への対処。submodule は親 checkout の一部として扱い、hook が起動できない場所でも「引数 1 つの cd」だけは通す
 timestamp: 2026-09-07
-status: Proposed
+status: Accepted
 ---
 # ADR-0009: submodule の中にいても hook を動かし、動かせない場所からは cd で戻れるようにする
 
