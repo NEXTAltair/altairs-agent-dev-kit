@@ -62,17 +62,17 @@ def roots():
     return active, common.parent
 
 
-BARE_CD = re.compile(
-    r"^[ \t]*(?:cd|Set-Location)(?:[ \t]+(?:\"[^\"$`;&|<>\n]*\"|'[^'\n]*'|[^\s\"'$`;&|<>()]+))?[ \t]*$"
-)
+BARE_CD = r"^[ \t]*(?:cd|Set-Location)(?:[ \t]+(?:\"[^\"$`;&|<>\n]*\"|'[^'\n]*'|[^\s\"'$`;&|<>()]+))?[ \t]*$"
+# PowerShell resolves command and alias names case-insensitively; POSIX shells do not.
+BARE_CD_BY_TOOL = {"Bash": re.compile(BARE_CD), "PowerShell": re.compile(BARE_CD, re.IGNORECASE)}
 
 
 def is_bare_cd(payload):
-    if not isinstance(payload, dict) or payload.get("tool_name") not in ("Bash", "PowerShell"):
+    if not isinstance(payload, dict) or payload.get("tool_name") not in BARE_CD_BY_TOOL:
         return False
     tool_input = payload.get("tool_input")
     command = tool_input.get("command") if isinstance(tool_input, dict) else None
-    return isinstance(command, str) and BARE_CD.fullmatch(command) is not None
+    return isinstance(command, str) and BARE_CD_BY_TOOL[payload["tool_name"]].fullmatch(command) is not None
 
 
 def validate(runtime, lock):

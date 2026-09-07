@@ -430,11 +430,12 @@ def test_codex_worktree_config_uses_shared_environment(tmp_path):
 
 
 def _git(cwd, *arguments):
-    subprocess.run(
+    result = subprocess.run(
         ["git", "-C", str(cwd), "-c", "user.name=Test", "-c", "user.email=test@example.com",
          "-c", "protocol.file.allow=always", *arguments],
-        check=True, capture_output=True, text=True, encoding="utf-8", timeout=30,
+        capture_output=True, text=True, encoding="utf-8", timeout=30,
     )
+    assert result.returncode == 0, (arguments, result.stderr)
 
 
 def _launch(script, event, cwd, payload, consumer=False):
@@ -502,10 +503,18 @@ def test_nested_repository_stays_unsupported_but_permits_bare_cd(tmp_path):
         assert result.returncode == 0, result.stderr
         assert result.stdout == "", command
         assert "runtime unavailable" in result.stderr
-    for command in ("cd .. && rm -rf x", "cd ..; ls", "cd $(pwd)", "cd `pwd`", "cd .. | cat"):
+    for command in ("cd .. && rm -rf x", "cd ..; ls", "cd $(pwd)", "cd `pwd`", "cd .. | cat", "CD .."):
         payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
         result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
         assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny", command
+    # PowerShell resolves command and alias names case-insensitively.
+    for command in ("CD ..", "set-location ..", "Set-Location 'C:\\work space'"):
+        payload = json.dumps({"tool_name": "PowerShell", "tool_input": {"command": command}})
+        result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
+        assert result.stdout == "", command
+    payload = json.dumps({"tool_name": "PowerShell", "tool_input": {"command": "Set-Location ..; Remove-Item x"}})
+    result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target / "x"), "content": "cd"}})
     result = _launch("hook_pre_edit_worktree.py", "PreToolUse", vendored, payload)
     assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"

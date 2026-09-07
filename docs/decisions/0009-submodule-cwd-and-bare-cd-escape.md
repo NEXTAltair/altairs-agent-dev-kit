@@ -1,60 +1,76 @@
 ---
 type: Decision
-title: "ADR-0009: submodule 内の cwd は所有 checkout に解決し、起動失敗時も単独の cd は拒否しない"
-description: submodule を固定する checkout を superproject 経由で辿って hook を継続し、入れ子 repository で runtime 解決に失敗しても単独の cd だけは通してエージェントが自力で脱出できるようにする
+title: "ADR-0009: submodule の中にいても hook を動かし、動かせない場所からは cd で戻れるようにする"
+description: submodule に cd しただけで全ツールが拒否され、戻る cd まで拒否されて詰む問題への対処。submodule は親 checkout の一部として扱い、hook が起動できない場所でも「引数 1 つの cd」だけは通す
 timestamp: 2026-09-07
 status: Proposed
 ---
-# ADR-0009: submodule 内の cwd は所有 checkout に解決し、起動失敗時も単独の cd は拒否しない
+# ADR-0009: submodule の中にいても hook を動かし、動かせない場所からは cd で戻れるようにする
 
-## Context
+## 何が起きたか
 
-`hooks/bootstrap.py` は起動プロセスの cwd から `--show-toplevel` で作業 checkout を決め、
-`--git-common-dir` で共有 checkout を求める。stale な `CLAUDE_PROJECT_DIR` や payload の `cwd` を
-信用しないための設計で、linked worktree ごとに追跡された lock を選ぶ根拠になっている
-([ADR-0008](0008-loop-contracts-and-hook-adapters.md)、[runtime 契約](../hook-runtime.md))。
+エージェントが Bash ツールで `cd local_packages/<pkg>` (submodule) を 1 回実行した。
+それ以降、セッションの作業ディレクトリがそこに固定され、次の状態になった。
 
-この解決は submodule を想定していなかった。submodule 内では `--show-toplevel` が submodule root、
-`--git-common-dir` が `<superproject>/.git/modules/<path>` を返すため、「shared checkout cannot be
-determined」として fatal になる。エージェントが submodule を in-place で編集する運用
-(consumer が `local_packages/*` を submodule で持つ構成) では、`cd local_packages/<pkg>` を一度
-実行しただけで PreToolUse (Bash / Edit / Write) が全て deny、Stop も block になり、
-cwd を戻す `cd` 自体も deny されるため、エージェント側に復旧手段が無くなる。
-同じことは tree 内に gitignore して置いた無関係な checkout (kit 自身の開発 checkout 等) に
-cd した場合にも起きる。こちらは lock を持たないので「lock が無い」として失敗する。
+- Bash / Edit / Write のすべてが hook に拒否される
+- 応答を終えようとしても Stop hook に差し戻される
+- 元の場所に戻るための `cd /workspaces/<project>` も拒否される
+- 人間がターミナルで `cd` するまで、エージェントには何もできない
 
-## Decision
+同じことは、プロジェクト内に gitignore して置いた別の Git checkout
+(kit 自身の開発 checkout など) に `cd` した場合にも起きる。
 
-- **submodule は、それを固定する checkout の一部として扱う。** 作業 checkout に lock が無ければ
-  `--show-superproject-working-tree` を辿り、lock を持つ checkout に着いた時点で停止する。
-  linked worktree 内で初期化した submodule はその worktree に属する。
-- **辿るのは Git が宣言する所有関係だけ。** ファイルシステムの親ディレクトリ探索や
-  `CLAUDE_PROJECT_DIR` への fallback は行わない。tree 内に入れ子になった無関係な repository は
-  引き続き非対応として診断し、上位ディレクトリの policy を借用しない。
-- **起動失敗時の PreToolUse は、引数なし・単一パス引数の `cd` (`Set-Location` を含む) だけ
-  deny しない。** stdout を空にして通常の permission flow に渡す。連結・置換を含む command は deny のまま。
-  Stop / WorktreeCreate 等の失敗契約は変更しない。
-- 診断文は、lock が見つからない作業 checkout のパスと「単独の `cd` で脱出できる」旨を含める。
+## なぜ起きたか
 
-## Rationale
+hook の起動コード (`hooks/bootstrap.py`) は「今どの checkout で動いているか」を
+作業ディレクトリから Git に聞いて決める。環境変数 `CLAUDE_PROJECT_DIR` は古い値が
+残ることがあるので信用しない、という設計である ([runtime 契約](../hook-runtime.md))。
 
-submodule 内の cwd を fatal にする理由は無い。submodule は superproject の tree に固定された
-成果物で、どの checkout に属するかは Git が一意に答えられる。superproject を辿る解決は
-「cwd が checkout を決める」原則を保ったまま、所有関係を正しく写すだけである。
-一方で無関係な入れ子 repository には所有者が居ないため、推測で親の policy を適用すると
-別プロジェクトの rule で別プロジェクトの操作を判定することになり、fail-closed の意味が無くなる。
+この判定は submodule を想定していなかった。
 
-単独の `cd` は policy が判定すべき処理を何も実行しない。これを deny すると、cwd が原因の失敗から
-エージェントが抜け出す唯一の手段が失われ、人間がターミナルで `cd` するまでセッションが止まる。
-fail-closed は「未検証の操作を通さない」ための性質であり、「何も実行しない操作まで止める」ことは
-目的に含まれない。
+| 場所 | `git rev-parse --show-toplevel` | `--git-common-dir` | 結果 |
+|---|---|---|---|
+| プロジェクト直下 | `<project>` | `<project>/.git` | 正常 |
+| linked worktree | `<worktree>` | `<project>/.git` | 正常 (worktree 自身の lock を使う) |
+| submodule の中 | `<project>/local_packages/<pkg>` | `<project>/.git/modules/...` | **「非対応の Git 配置」として失敗** |
+| 無関係な入れ子 checkout | `<project>/vendored` | `<project>/vendored/.git` | lock が無いので失敗 |
 
-## Consequences
+失敗すると fail-closed (何も通さない) になる。ここに `cd` も含まれていたため、
+失敗の原因である「作業ディレクトリ」を直す手段そのものが失われた。
 
-- consumer は submodule 内を作業ディレクトリにしても hook 保護を失わない。override は
-  所有 checkout の `.claude/hooks/rules/*.json` が使われる。
-- 入れ子の無関係 repository に入った場合は依然として deny されるが、診断に従って `cd` で戻れる。
-- `tests/test_portable_install.py` が submodule (main / linked worktree) と入れ子 repository の
-  両ケースを実起動で固定する。
-- bootstrap は registration に埋め込まれるため、consumer は kit の pin 更新と登録の再生成
-  (`--refresh-wiring` 相当) を行って初めてこの挙動を得る。runtime だけの復元では変わらない。
+## どうするか
+
+### 1. submodule は「それを固定している checkout の一部」として扱う
+
+作業ディレクトリの checkout に lock (`.agent-kit/hooks.lock.json`) が無ければ、
+`git rev-parse --show-superproject-working-tree` で親 (superproject) を辿り、
+lock を持つ checkout に着いたらそこを作業 checkout とする。
+
+- `<project>/local_packages/<pkg>` にいる → `<project>` として hook が動く
+- linked worktree の中で `submodule update --init` した submodule にいる → その worktree として動く
+- 辿るのは **Git が submodule として登録している親だけ**。ファイルシステム上の親ディレクトリや
+  `CLAUDE_PROJECT_DIR` は見ない。無関係な入れ子 checkout は今までどおり失敗する
+  (別プロジェクトの rule で判定してしまうのを避けるため)
+
+### 2. hook が起動できない場所でも「引数 1 つの `cd`」だけは通す
+
+起動失敗時の PreToolUse は、次の形の command だけ拒否せず通常の permission flow に渡す。
+
+- `cd` / `cd <パス>` / `cd "<パス>"` (PowerShell の `Set-Location`、大文字小文字の違いも含む)
+- `&&` `;` `|` での連結、`$(...)` やバッククオートの置換を含むものは今までどおり拒否
+
+`cd` 単独は何も実行しないので、policy で判定すべきものが無い。そして cwd が原因の失敗から
+エージェント自身が抜け出す唯一の手段である。Stop や WorktreeCreate の失敗時の挙動は変えない。
+
+### 3. 診断文に「どの checkout に lock が無かったか」と「`cd` で戻れる」ことを書く
+
+## この変更で何が変わるか
+
+- submodule の中を作業ディレクトリにしても hook の保護は効いたまま。override は親 checkout の
+  `.claude/hooks/rules/*.json` が使われる
+- 無関係な入れ子 checkout に入った場合は依然として拒否されるが、診断のとおり `cd` で戻れる
+- consumer 側は、**kit の pin 更新と登録の再生成 (`--refresh-wiring` 相当) を行って初めて**
+  この挙動になる。起動コードは `.claude/settings.json` に埋め込まれているため、
+  runtime を復元し直すだけでは変わらない
+- `tests/test_portable_install.py` が submodule (main / linked worktree) と入れ子 checkout の
+  両方を実起動で固定する
