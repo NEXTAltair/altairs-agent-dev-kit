@@ -89,7 +89,9 @@ Stop の再入 (`stop_hook_active: true`) は stderr に診断を残して exit 
 再び停止を拒否して無限ループすることを防ぐ。
 PreToolUse の例外は引数なし・単一パス引数の `cd` だけで、stdout を空にして通常の permission flow へ渡す。
 Bash は builtin の `cd` のみ、PowerShell は `cd` / `Set-Location` を大文字小文字を区別せずに認める
-(それ以外の名前は任意の実行ファイルや関数に解決し得る)。連結 (`&&` `;` `|`)・置換 (`$(...)` バッククオート)
+(それ以外の名前は任意の実行ファイルや関数に解決し得る)。Codex の payload は `tool_name` を持たず
+`tool_input.cmd` に command を載せるため、provider が codex のときは host の shell
+(Windows なら PowerShell、それ以外は Bash) の規則で判定する。連結 (`&&` `;` `|`)・置換 (`$(...)` バッククオート)
 を含むものは deny のまま。この例外は policy が判定すべき処理を一切実行せず、cwd が入れ子 repository に
 入ったことによる失敗からエージェント自身が脱出する唯一の手段であるために設ける。
 WorktreeCreate / TeammateIdle などは exit 2 で失敗する。正常な検査成功として扱わない。

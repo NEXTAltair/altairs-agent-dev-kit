@@ -59,6 +59,7 @@ hook の起動コード (`hooks/bootstrap.py`) は「今どの checkout で動�
 
 - `cd` / `cd <パス>` / `cd "<パス>"`。Bash は builtin の `cd` のみ。PowerShell は `cd` と
   `Set-Location` を大文字小文字を区別せずに認める (それ以外の名前は任意の実行ファイルや関数になり得る)
+- Codex の payload (`tool_name` 無し、command は `tool_input.cmd`) は host の shell の規則で判定する
 - `&&` `;` `|` での連結、`$(...)` やバッククオートの置換を含むものは今までどおり拒否
 
 `cd` 単独は何も実行しないので、policy で判定すべきものが無い。そして cwd が原因の失敗から

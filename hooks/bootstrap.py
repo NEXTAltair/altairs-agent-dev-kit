@@ -47,10 +47,14 @@ def roots():
     # standalone use never outranks the pinning checkout. Only Git-declared ownership is
     # followed: a linked worktree keeps its own tracked lock, and an unrelated repository
     # nested in the tree never borrows the policy of the directory above it.
-    for _ in range(16):
+    visited = {active}
+    while True:
         owner = superproject(active)
         if owner is None:
             break
+        if owner in visited:
+            raise ValueError("submodule ownership cycle at " + str(owner))
+        visited.add(owner)
         active = owner
     if not (active / LOCK).is_file():
         raise ValueError(LOCK + " not found in active checkout " + str(active)
@@ -70,12 +74,19 @@ BARE_CD_BY_TOOL = {
 }
 
 
-def is_bare_cd(payload):
-    if not isinstance(payload, dict) or payload.get("tool_name") not in BARE_CD_BY_TOOL:
+def is_bare_cd(payload, provider):
+    if not isinstance(payload, dict) or not isinstance(payload.get("tool_input"), dict):
         return False
-    tool_input = payload.get("tool_input")
-    command = tool_input.get("command") if isinstance(tool_input, dict) else None
-    return isinstance(command, str) and BARE_CD_BY_TOOL[payload["tool_name"]].fullmatch(command) is not None
+    tool_input = payload["tool_input"]
+    if provider == "codex":
+        # Codex omits tool_name, may carry the command in `cmd`, and runs the host shell.
+        shell = "PowerShell" if os.name == "nt" else "Bash"
+        command = tool_input.get("command") or tool_input.get("cmd")
+    else:
+        shell = payload.get("tool_name")
+        command = tool_input.get("command")
+    pattern = BARE_CD_BY_TOOL.get(shell)
+    return pattern is not None and isinstance(command, str) and pattern.fullmatch(command) is not None
 
 
 def validate(runtime, lock):
@@ -96,7 +107,7 @@ def validate(runtime, lock):
     return runtime
 
 
-def failure(event, error):
+def failure(event, error, provider="claude"):
     reason = ("agent-kit runtime unavailable: " + str(error)
               + ". Restore the branch-pinned kit from the pinned kit checkout with"
               + " scripts/install_harness.py --runtime-only --target <checkout> (or the consumer's own restore command)."
@@ -112,7 +123,7 @@ def failure(event, error):
         # A bare `cd` runs nothing the policy could judge, and it is the only way an agent
         # can leave a nested repository whose cwd caused this failure. Everything else is
         # denied: leaving stdout empty here hands the call to the normal permission flow.
-        if is_bare_cd(payload):
+        if is_bare_cd(payload, provider):
             return
         print(json.dumps({"hookSpecificOutput": {"hookEventName": event,
               "permissionDecision": "deny", "permissionDecisionReason": reason}}))
@@ -165,6 +176,6 @@ def launch(script, provider="claude", event="PreToolUse", consumer=False, plugin
         sys.modules["hook_common"] = common
         sys.path.insert(0, str(runtime / "hooks/scripts"))
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
-        failure(event, error)
+        failure(event, error, provider)
         return
     runpy.run_path(str(entry), run_name="__main__")

@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 KIT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(KIT / "scripts"))
 from install_harness import install  # noqa: E402
@@ -438,12 +440,29 @@ def _git(cwd, *arguments):
     assert result.returncode == 0, (arguments, result.stderr)
 
 
-def _launch(script, event, cwd, payload, consumer=False):
+def _launch(script, event, cwd, payload, consumer=False, provider="claude"):
     from install_harness import hook_bootstrap
+    code = hook_bootstrap(script, provider=provider, event=event, consumer=consumer)
     return subprocess.run(
-        [sys.executable, "-X", "utf8", "-c", hook_bootstrap(script, event=event, consumer=consumer)],
+        [sys.executable, "-X", "utf8", "-c", code],
         input=payload, cwd=cwd, capture_output=True, text=True, encoding="utf-8", timeout=20,
     )
+
+
+def test_ownership_chain_is_followed_to_the_outermost_superproject(tmp_path, monkeypatch):
+    import bootstrap
+    owner = tmp_path / "owner"
+    (owner / ".git").mkdir(parents=True)
+    (owner / ".agent-kit").mkdir()
+    (owner / ".agent-kit/hooks.lock.json").write_text("{}", encoding="utf-8")
+    chain = [tmp_path / f"level{depth}" for depth in range(40)] + [owner]
+    parents = {chain[index]: chain[index + 1] for index in range(len(chain) - 1)}
+    monkeypatch.setattr(bootstrap, "superproject", lambda checkout: parents.get(checkout))
+    monkeypatch.setattr(bootstrap, "git_root", lambda cwd, *args: chain[0] if "--show-toplevel" in args else owner / ".git")
+    assert bootstrap.roots() == (owner, owner)
+    parents[owner] = chain[3]
+    with pytest.raises(ValueError, match="cycle"):
+        bootstrap.roots()
 
 
 def test_submodule_cwd_resolves_owning_checkout(tmp_path):
@@ -525,6 +544,12 @@ def test_nested_repository_stays_unsupported_but_permits_bare_cd(tmp_path):
     payload = json.dumps({"tool_name": "PowerShell", "tool_input": {"command": "Set-Location ..; Remove-Item x"}})
     result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
     assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    # Codex payloads carry the command in `cmd` and omit `tool_name`; its shell is the host shell.
+    for command, escaped in (("cd ..", True), ("cd .. && ls", False), ("ls", False)):
+        payload = json.dumps({"tool_input": {"cmd": command}})
+        result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload, provider="codex")
+        assert result.returncode == 0, result.stderr
+        assert (result.stdout == "") is escaped, command
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target / "x"), "content": "cd"}})
     result = _launch("hook_pre_edit_worktree.py", "PreToolUse", vendored, payload)
     assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
