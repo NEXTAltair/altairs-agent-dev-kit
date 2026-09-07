@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 KIT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(KIT / "scripts"))
 from install_harness import install  # noqa: E402
@@ -427,3 +429,127 @@ def test_codex_worktree_config_uses_shared_environment(tmp_path):
         )
         assert result.returncode == 0, result.stderr
         assert result.stdout == "", result.stdout
+
+
+def _git(cwd, *arguments):
+    result = subprocess.run(
+        ["git", "-C", str(cwd), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+         "-c", "protocol.file.allow=always", *arguments],
+        capture_output=True, text=True, encoding="utf-8", timeout=30,
+    )
+    assert result.returncode == 0, (arguments, result.stderr)
+
+
+def _launch(script, event, cwd, payload, consumer=False, provider="claude"):
+    from install_harness import hook_bootstrap
+    code = hook_bootstrap(script, provider=provider, event=event, consumer=consumer)
+    return subprocess.run(
+        [sys.executable, "-X", "utf8", "-c", code],
+        input=payload, cwd=cwd, capture_output=True, text=True, encoding="utf-8", timeout=20,
+    )
+
+
+def test_ownership_chain_is_followed_to_the_outermost_superproject(tmp_path, monkeypatch):
+    import bootstrap
+    owner = tmp_path / "owner"
+    (owner / ".git").mkdir(parents=True)
+    (owner / ".agent-kit").mkdir()
+    (owner / ".agent-kit/hooks.lock.json").write_text("{}", encoding="utf-8")
+    chain = [tmp_path / f"level{depth}" for depth in range(40)] + [owner]
+    parents = {chain[index]: chain[index + 1] for index in range(len(chain) - 1)}
+    monkeypatch.setattr(bootstrap, "superproject", lambda checkout: parents.get(checkout))
+    monkeypatch.setattr(bootstrap, "git_root", lambda cwd, *args: chain[0] if "--show-toplevel" in args else owner / ".git")
+    assert bootstrap.roots() == (owner, owner)
+    parents[owner] = chain[3]
+    with pytest.raises(ValueError, match="cycle"):
+        bootstrap.roots()
+
+
+def test_submodule_cwd_resolves_owning_checkout(tmp_path):
+    """A submodule is part of the checkout that pins it; hooks keep working from inside it."""
+    from install_harness import install_runtime
+    target = tmp_path / "super 日本語"
+    target.mkdir()
+    _git(tmp_path, "init", "-q", str(target))
+    install_runtime(target)
+    consumer = target / ".claude/hooks/teammate.py"
+    consumer.parent.mkdir(parents=True)
+    consumer.write_text("from hook_common import find_project_root\nprint(find_project_root())\n", encoding="utf-8")
+    library = tmp_path / "library"
+    _git(tmp_path, "init", "-q", str(library))
+    _git(library, "commit", "--allow-empty", "-m", "library")
+    _git(target, "submodule", "add", "-q", library.as_uri(), "local_packages/library")
+    # Only the tracked lock and consumer hook join the commit: the published runtime must stay
+    # untracked, or a linked worktree checkout of these 64-hex paths exceeds MAX_PATH on Windows.
+    _git(target, "add", ".agent-kit/hooks.lock.json", ".claude/hooks/teammate.py")
+    _git(target, "commit", "-q", "-m", "pin")
+    inside = target / "local_packages/library"
+    blocked = '{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}'
+
+    result = _launch("hook_pre_commands.py", "PreToolUse", inside, blocked)
+    assert result.returncode == 0, result.stderr
+    assert "runtime unavailable" not in result.stderr
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    result = _launch(".claude/hooks/teammate.py", "TeammateIdle", inside, "{}", consumer=True)
+    assert result.returncode == 0, result.stderr
+    assert Path(result.stdout.strip()) == target.resolve()
+    # A lock the submodule carries for its own standalone use never outranks the pinning checkout.
+    (inside / ".agent-kit").mkdir()
+    (inside / ".agent-kit/hooks.lock.json").write_text('{"schema":1,"runtime":"' + "f" * 64 + '"}', encoding="utf-8")
+    result = _launch(".claude/hooks/teammate.py", "TeammateIdle", inside, "{}", consumer=True)
+    assert result.returncode == 0, result.stderr
+    assert Path(result.stdout.strip()) == target.resolve()
+
+    # A submodule initialised inside a linked worktree belongs to that worktree, not to main.
+    worktree = target / ".agents/worktree/feature"
+    _git(target, "worktree", "add", "--detach", str(worktree))
+    _git(worktree, "submodule", "update", "--init", "-q")
+    result = _launch(".claude/hooks/teammate.py", "TeammateIdle", worktree / "local_packages/library", "{}",
+                     consumer=True)
+    assert result.returncode == 0, result.stderr
+    assert Path(result.stdout.strip()) == worktree.resolve()
+
+
+def test_nested_repository_stays_unsupported_but_permits_bare_cd(tmp_path):
+    """An unrelated repository nested in the checkout never borrows its policy, yet cwd can be repaired."""
+    from install_harness import install_runtime
+    target = tmp_path / "project"
+    target.mkdir()
+    _git(tmp_path, "init", "-q", str(target))
+    install_runtime(target)
+    vendored = target / "vendored-kit"
+    _git(target, "init", "-q", str(vendored))
+    blocked = '{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}'
+
+    result = _launch("hook_pre_commands.py", "PreToolUse", vendored, blocked)
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "hooks.lock.json" in result.stderr and str(vendored.resolve()) in result.stderr
+    for command in ("cd " + str(target), 'cd "%s"' % target, "cd ..", "cd"):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+        result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == "", command
+        assert "runtime unavailable" in result.stderr
+    # Bash knows no Set-Location builtin: that name could resolve to any executable or function.
+    for command in ("cd .. && rm -rf x", "cd ..; ls", "cd $(pwd)", "cd `pwd`", "cd .. | cat", "CD ..",
+                    "Set-Location .."):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+        result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
+        assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny", command
+    # PowerShell resolves command and alias names case-insensitively.
+    for command in ("CD ..", "set-location ..", "Set-Location 'C:\\work space'"):
+        payload = json.dumps({"tool_name": "PowerShell", "tool_input": {"command": command}})
+        result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
+        assert result.stdout == "", command
+    payload = json.dumps({"tool_name": "PowerShell", "tool_input": {"command": "Set-Location ..; Remove-Item x"}})
+    result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    # Codex payloads carry the command in `cmd` and omit `tool_name`; its shell is the host shell.
+    for command, escaped in (("cd ..", True), ("cd .. && ls", False), ("ls", False)):
+        payload = json.dumps({"tool_input": {"cmd": command}})
+        result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload, provider="codex")
+        assert result.returncode == 0, result.stderr
+        assert (result.stdout == "") is escaped, command
+    payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target / "x"), "content": "cd"}})
+    result = _launch("hook_pre_edit_worktree.py", "PreToolUse", vendored, payload)
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"

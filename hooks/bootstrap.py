@@ -32,12 +32,61 @@ def git_root(cwd, *args):
     ).strip()).resolve()
 
 
+def superproject(checkout):
+    output = subprocess.check_output(
+        ["git", "-C", str(checkout), "rev-parse", "--show-superproject-working-tree"],
+        text=True, encoding="utf-8", stderr=subprocess.PIPE, timeout=5,
+    ).strip()
+    return Path(output).resolve() if output else None
+
+
 def roots():
     active = git_root(Path.cwd(), "--show-toplevel")
+    # A submodule is part of the checkout that pins it, so climb to the outermost
+    # superproject before looking for the lock: a lock the submodule carries for its own
+    # standalone use never outranks the pinning checkout. Only Git-declared ownership is
+    # followed: a linked worktree keeps its own tracked lock, and an unrelated repository
+    # nested in the tree never borrows the policy of the directory above it.
+    visited = {active}
+    while True:
+        owner = superproject(active)
+        if owner is None:
+            break
+        if owner in visited:
+            raise ValueError("submodule ownership cycle at " + str(owner))
+        visited.add(owner)
+        active = owner
+    if not (active / LOCK).is_file():
+        raise ValueError(LOCK + " not found in active checkout " + str(active)
+                         + " (a bare `cd <owning checkout>` is permitted to leave a nested repository)")
     common = git_root(active, "--path-format=absolute", "--git-common-dir")
     if common.name != ".git" or not (common.parent / ".git").is_dir():
         raise ValueError("unsupported Git layout: shared checkout cannot be determined")
     return active, common.parent
+
+
+BARE_CD_ARGUMENT = r"(?:[ \t]+(?:\"[^\"$`;&|<>\n]*\"|'[^'\n]*'|[^\s\"'$`;&|<>()]+))?[ \t]*$"
+# Bash has only the `cd` builtin; PowerShell adds `Set-Location` and resolves names
+# case-insensitively. Any other name could be an arbitrary executable or function.
+BARE_CD_BY_TOOL = {
+    "Bash": re.compile(r"^[ \t]*cd" + BARE_CD_ARGUMENT),
+    "PowerShell": re.compile(r"^[ \t]*(?:cd|Set-Location)" + BARE_CD_ARGUMENT, re.IGNORECASE),
+}
+
+
+def is_bare_cd(payload, provider):
+    if not isinstance(payload, dict) or not isinstance(payload.get("tool_input"), dict):
+        return False
+    tool_input = payload["tool_input"]
+    if provider == "codex":
+        # Codex omits tool_name, may carry the command in `cmd`, and runs the host shell.
+        shell = "PowerShell" if os.name == "nt" else "Bash"
+        command = tool_input.get("command") or tool_input.get("cmd")
+    else:
+        shell = payload.get("tool_name")
+        command = tool_input.get("command")
+    pattern = BARE_CD_BY_TOOL.get(shell)
+    return pattern is not None and isinstance(command, str) and pattern.fullmatch(command) is not None
 
 
 def validate(runtime, lock):
@@ -58,22 +107,27 @@ def validate(runtime, lock):
     return runtime
 
 
-def failure(event, error):
+def failure(event, error, provider="claude"):
     reason = ("agent-kit runtime unavailable: " + str(error)
-              + ". Restore the branch-pinned kit using scripts/install_harness.py --runtime-only --target <checkout>."
+              + ". Restore the branch-pinned kit from the pinned kit checkout with"
+              + " scripts/install_harness.py --runtime-only --target <checkout> (or the consumer's own restore command)."
               + " If an existing runtime is corrupt, stop hook sessions and move its directory aside first; see docs/hook-runtime.md.")
     print(reason, file=sys.stderr)
+    # The runtime's own guards cannot run when startup failed. Read stdin only on this
+    # failure path; successful consumer launches must receive the original stream unchanged.
+    try:
+        payload = json.load(sys.stdin)
+    except (OSError, ValueError):
+        payload = None
     if event == "PreToolUse":
+        # A bare `cd` runs nothing the policy could judge, and it is the only way an agent
+        # can leave a nested repository whose cwd caused this failure. Everything else is
+        # denied: leaving stdout empty here hands the call to the normal permission flow.
+        if is_bare_cd(payload, provider):
+            return
         print(json.dumps({"hookSpecificOutput": {"hookEventName": event,
               "permissionDecision": "deny", "permissionDecisionReason": reason}}))
     elif event == "Stop":
-        # The runtime's own recursion guard cannot run when startup failed.
-        # Read stdin only on this failure path; successful consumer launches
-        # must receive the original stream unchanged.
-        try:
-            payload = json.load(sys.stdin)
-        except (OSError, ValueError):
-            payload = None
         if isinstance(payload, dict) and payload.get("stop_hook_active"):
             return
         print(json.dumps({"decision": "block", "reason": reason}))
@@ -122,6 +176,6 @@ def launch(script, provider="claude", event="PreToolUse", consumer=False, plugin
         sys.modules["hook_common"] = common
         sys.path.insert(0, str(runtime / "hooks/scripts"))
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
-        failure(event, error)
+        failure(event, error, provider)
         return
     runpy.run_path(str(entry), run_name="__main__")
