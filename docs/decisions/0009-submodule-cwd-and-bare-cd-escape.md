@@ -42,12 +42,13 @@ hook の起動コード (`hooks/bootstrap.py`) は「今どの checkout で動�
 
 ### 1. submodule は「それを固定している checkout の一部」として扱う
 
-作業ディレクトリの checkout に lock (`.agent-kit/hooks.lock.json`) が無ければ、
-`git rev-parse --show-superproject-working-tree` で親 (superproject) を辿り、
-lock を持つ checkout に着いたらそこを作業 checkout とする。
+`git rev-parse --show-superproject-working-tree` で親 (superproject) を最外まで辿り、
+そこを作業 checkout として lock (`.agent-kit/hooks.lock.json`) を探す。
 
 - `<project>/local_packages/<pkg>` にいる → `<project>` として hook が動く
 - linked worktree の中で `submodule update --init` した submodule にいる → その worktree として動く
+- submodule 自身が (単独で kit を使うために) lock を持っていても無視する。どの rule で判定するかは
+  submodule を固定している側が決める
 - 辿るのは **Git が submodule として登録している親だけ**。ファイルシステム上の親ディレクトリや
   `CLAUDE_PROJECT_DIR` は見ない。無関係な入れ子 checkout は今までどおり失敗する
   (別プロジェクトの rule で判定してしまうのを避けるため)
@@ -56,7 +57,8 @@ lock を持つ checkout に着いたらそこを作業 checkout とする。
 
 起動失敗時の PreToolUse は、次の形の command だけ拒否せず通常の permission flow に渡す。
 
-- `cd` / `cd <パス>` / `cd "<パス>"` (PowerShell の `Set-Location`、大文字小文字の違いも含む)
+- `cd` / `cd <パス>` / `cd "<パス>"`。Bash は builtin の `cd` のみ。PowerShell は `cd` と
+  `Set-Location` を大文字小文字を区別せずに認める (それ以外の名前は任意の実行ファイルや関数になり得る)
 - `&&` `;` `|` での連結、`$(...)` やバッククオートの置換を含むものは今までどおり拒否
 
 `cd` 単独は何も実行しないので、policy で判定すべきものが無い。そして cwd が原因の失敗から

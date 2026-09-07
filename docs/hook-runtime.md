@@ -13,9 +13,10 @@ override を所有する。固有フックのために `hook_common` や runtime
 
 - 作業 checkout: Git の `--show-toplevel`。ここにある `.agent-kit/hooks.lock.json` と
   `.claude/hooks/rules/*.json` を使う。サブディレクトリ起動でも同じ。親 checkout の lock へ fallback しない。
-- submodule 内で起動した場合: submodule はそれを固定する checkout の一部なので、lock を持つ
-  checkout に着くまで `--show-superproject-working-tree` を辿る (linked worktree 内の submodule は
-  その worktree に属する)。辿るのは Git が宣言する所有関係だけで、tree 内に入れ子になった無関係な
+- submodule 内で起動した場合: submodule はそれを固定する checkout の一部なので、
+  `--show-superproject-working-tree` を最外の superproject まで辿り、そこの lock を使う
+  (linked worktree 内の submodule はその worktree に属する)。submodule 自身が単独利用のために
+  持つ lock は無視する。辿るのは Git が宣言する所有関係だけで、tree 内に入れ子になった無関係な
   repository (gitignore した vendored checkout 等) は上位ディレクトリの policy を借用せず、非対応として診断する。
 - 共有 checkout: `--git-common-dir` が指す `.git` の親。共有資源と共有 checkout の編集保護対象を計算する。
   bare repository / separate-git-dir は非対応で、診断して拒否する。
@@ -86,8 +87,9 @@ runtime 欠損・版不一致・不正 lock・Git root 検出失敗は stderr �
 Stop は `decision=block` (ともに exit 0 の構造化拒否) を返す。
 Stop の再入 (`stop_hook_active: true`) は stderr に診断を残して exit 0 で終了し、
 再び停止を拒否して無限ループすることを防ぐ。
-PreToolUse の例外は引数なし・単一パス引数の `cd` (PowerShell の `Set-Location` を含む) だけで、
-stdout を空にして通常の permission flow へ渡す。連結 (`&&` `;` `|`)・置換 (`$(...)` バッククオート)
+PreToolUse の例外は引数なし・単一パス引数の `cd` だけで、stdout を空にして通常の permission flow へ渡す。
+Bash は builtin の `cd` のみ、PowerShell は `cd` / `Set-Location` を大文字小文字を区別せずに認める
+(それ以外の名前は任意の実行ファイルや関数に解決し得る)。連結 (`&&` `;` `|`)・置換 (`$(...)` バッククオート)
 を含むものは deny のまま。この例外は policy が判定すべき処理を一切実行せず、cwd が入れ子 repository に
 入ったことによる失敗からエージェント自身が脱出する唯一の手段であるために設ける。
 WorktreeCreate / TeammateIdle などは exit 2 で失敗する。正常な検査成功として扱わない。

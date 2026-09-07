@@ -460,7 +460,9 @@ def test_submodule_cwd_resolves_owning_checkout(tmp_path):
     _git(tmp_path, "init", "-q", str(library))
     _git(library, "commit", "--allow-empty", "-m", "library")
     _git(target, "submodule", "add", "-q", library.as_uri(), "local_packages/library")
-    _git(target, "add", "-A")
+    # Only the tracked lock and consumer hook join the commit: the published runtime must stay
+    # untracked, or a linked worktree checkout of these 64-hex paths exceeds MAX_PATH on Windows.
+    _git(target, "add", ".agent-kit/hooks.lock.json", ".claude/hooks/teammate.py")
     _git(target, "commit", "-q", "-m", "pin")
     inside = target / "local_packages/library"
     blocked = '{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}'
@@ -469,6 +471,12 @@ def test_submodule_cwd_resolves_owning_checkout(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "runtime unavailable" not in result.stderr
     assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    result = _launch(".claude/hooks/teammate.py", "TeammateIdle", inside, "{}", consumer=True)
+    assert result.returncode == 0, result.stderr
+    assert Path(result.stdout.strip()) == target.resolve()
+    # A lock the submodule carries for its own standalone use never outranks the pinning checkout.
+    (inside / ".agent-kit").mkdir()
+    (inside / ".agent-kit/hooks.lock.json").write_text('{"schema":1,"runtime":"' + "f" * 64 + '"}', encoding="utf-8")
     result = _launch(".claude/hooks/teammate.py", "TeammateIdle", inside, "{}", consumer=True)
     assert result.returncode == 0, result.stderr
     assert Path(result.stdout.strip()) == target.resolve()
@@ -503,7 +511,9 @@ def test_nested_repository_stays_unsupported_but_permits_bare_cd(tmp_path):
         assert result.returncode == 0, result.stderr
         assert result.stdout == "", command
         assert "runtime unavailable" in result.stderr
-    for command in ("cd .. && rm -rf x", "cd ..; ls", "cd $(pwd)", "cd `pwd`", "cd .. | cat", "CD .."):
+    # Bash knows no Set-Location builtin: that name could resolve to any executable or function.
+    for command in ("cd .. && rm -rf x", "cd ..; ls", "cd $(pwd)", "cd `pwd`", "cd .. | cat", "CD ..",
+                    "Set-Location .."):
         payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
         result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
         assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny", command

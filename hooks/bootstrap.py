@@ -42,13 +42,12 @@ def superproject(checkout):
 
 def roots():
     active = git_root(Path.cwd(), "--show-toplevel")
-    # A submodule is part of the checkout that pins it, so climb superprojects until the
-    # owning checkout with the lock is reached. Only Git-declared ownership is followed:
-    # a linked worktree keeps its own tracked lock, and an unrelated repository nested in
-    # the tree never borrows the policy of the directory above it.
+    # A submodule is part of the checkout that pins it, so climb to the outermost
+    # superproject before looking for the lock: a lock the submodule carries for its own
+    # standalone use never outranks the pinning checkout. Only Git-declared ownership is
+    # followed: a linked worktree keeps its own tracked lock, and an unrelated repository
+    # nested in the tree never borrows the policy of the directory above it.
     for _ in range(16):
-        if (active / LOCK).is_file():
-            break
         owner = superproject(active)
         if owner is None:
             break
@@ -62,9 +61,13 @@ def roots():
     return active, common.parent
 
 
-BARE_CD = r"^[ \t]*(?:cd|Set-Location)(?:[ \t]+(?:\"[^\"$`;&|<>\n]*\"|'[^'\n]*'|[^\s\"'$`;&|<>()]+))?[ \t]*$"
-# PowerShell resolves command and alias names case-insensitively; POSIX shells do not.
-BARE_CD_BY_TOOL = {"Bash": re.compile(BARE_CD), "PowerShell": re.compile(BARE_CD, re.IGNORECASE)}
+BARE_CD_ARGUMENT = r"(?:[ \t]+(?:\"[^\"$`;&|<>\n]*\"|'[^'\n]*'|[^\s\"'$`;&|<>()]+))?[ \t]*$"
+# Bash has only the `cd` builtin; PowerShell adds `Set-Location` and resolves names
+# case-insensitively. Any other name could be an arbitrary executable or function.
+BARE_CD_BY_TOOL = {
+    "Bash": re.compile(r"^[ \t]*cd" + BARE_CD_ARGUMENT),
+    "PowerShell": re.compile(r"^[ \t]*(?:cd|Set-Location)" + BARE_CD_ARGUMENT, re.IGNORECASE),
+}
 
 
 def is_bare_cd(payload):
