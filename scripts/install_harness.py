@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -100,14 +101,36 @@ def atomic_json(path: Path, data: dict) -> None:
         Path(temporary).unlink(missing_ok=True)
 
 
+def require_git_checkout(target: Path) -> Path:
+    """Refuse targets outside a Git checkout before anything is written.
+
+    Hooks pin runtimes per checkout and guard worktrees through Git, so a runtime
+    installed into a plain directory can never start; the launch contract then denies
+    every tool call with a misleading "restore the runtime" hint.
+    """
+    try:
+        top = git_root(target, "--show-toplevel")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as error:
+        raise ValueError(
+            f"{target} is not a Git repository. Hooks require Git to pin the runtime and"
+            " guard worktrees. Run `git init` in the project root, then rerun the installer."
+            " Nothing was installed."
+        ) from error
+    if top != target.resolve():
+        raise ValueError(
+            f"--target must be the repository root ({top}); the runtime lock is only"
+            f" discovered there. Nothing was installed."
+        )
+    return top
+
+
 def shared_checkout(target: Path) -> Path:
-    """Locate shared resources; permit non-Git installation staging directories."""
-    if (target / ".git").exists():
-        common = git_root(target, "--path-format=absolute", "--git-common-dir")
-        if common.name != ".git":
-            raise ValueError("unsupported Git layout")
-        return common.parent
-    return target.resolve()
+    """Locate the main checkout whose .agent-kit/runtimes/ this target shares."""
+    require_git_checkout(target)
+    common = git_root(target, "--path-format=absolute", "--git-common-dir")
+    if common.name != ".git":
+        raise ValueError("unsupported Git layout")
+    return common.parent
 
 
 def install_runtime(target: Path, force: bool = False) -> dict:
@@ -118,12 +141,12 @@ def install_runtime(target: Path, force: bool = False) -> dict:
     """
     if not target.is_dir():
         raise ValueError("--target must be an existing project directory")
+    require_git_checkout(target)
     lock = runtime_lock()
     lock_path = target / LOCK
     if lock_path.exists() and not force:
         if json.loads(lock_path.read_text(encoding="utf-8")) != lock:
             raise ValueError("source differs from branch lock; restore its pinned source or use --force to repin")
-    # Installation into a non-Git staging directory is supported. Execution requires Git.
     shared = shared_checkout(target)
     store = shared / ".agent-kit/runtimes"
     store.mkdir(parents=True, exist_ok=True)
@@ -188,10 +211,13 @@ def main() -> None:
     parser.add_argument("--codex", action="store_true", help="Also install local Codex config and agents")
     parser.add_argument("--runtime-only", action="store_true", help="Restore runtime without changing event registrations")
     args = parser.parse_args()
-    if args.runtime_only:
-        install_runtime(args.target.resolve(), args.force)
-        return
-    wiring = install(args.target.resolve(), args.force, args.codex)
+    try:
+        if args.runtime_only:
+            install_runtime(args.target.resolve(), args.force)
+            return
+        wiring = install(args.target.resolve(), args.force, args.codex)
+    except (ValueError, RuntimeError, FileExistsError) as error:
+        raise SystemExit(f"ERROR: {error}") from error
     print("Merge this hooks object into .claude/settings.json:")
     print(json.dumps(wiring, indent=2))
 

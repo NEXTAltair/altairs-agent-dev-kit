@@ -30,9 +30,15 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
-git checkout v0.3.0
+git checkout v0.3.2
 ./install.sh --target /path/to/your-repo --all
 ```
+
+タグの checkout が必要なのは `--skills` を含む場合で、skills.sh CLI の制約ではなくこの kit のポリシー。
+install.sh は checkout 中のタグを `github:owner/repo#<tag>` として `skills-lock.json` に記録するため、
+タグのない commit では止まる (ブランチ名を pin すると後で中身が変わり、未公開 commit は他環境で解決できないため)。
+開発 checkout を試すときだけ `--skill-source <ローカルパス>` を明示する。hooks / rules / agents のみなら
+タグなしでも導入できるが、hooks の runtime lock を後で復元するには同じソースが要るのでタグ checkout を推奨する。
 
 | フラグ | 導入内容 |
 |---|---|
@@ -47,6 +53,10 @@ git checkout v0.3.0
 
 `--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するだけなので、
 表示された JSON を `<repo>/.claude/settings.json` の `hooks` キーへ手動で貼り付けること。
+
+`--hooks` / `--codex` の導入先は Git repository の root が前提 (runtime の版固定と worktree 判定に Git を使う)。
+Git repository でない場合や配下ディレクトリを指定した場合、installer は何も書き込まずにメッセージを出して停止する。
+先に `git init` を実行してから再実行すること。skills / rules / agents のみの導入に Git は不要。
 
 Windows PowerShell のフック導入には次を利用できる (Python 3.10+ と Git が必要):
 
