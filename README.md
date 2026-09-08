@@ -30,9 +30,15 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
-git checkout v0.3.0
+git checkout v0.3.2
 ./install.sh --target /path/to/your-repo --all
 ```
+
+タグの checkout が必要なのは `--skills` を含む場合で、skills.sh CLI の制約ではなくこの kit のポリシー。
+install.sh は checkout 中のタグを `github:owner/repo#<tag>` として `skills-lock.json` に記録するため、
+タグのない commit では止まる (ブランチ名を pin すると後で中身が変わり、未公開 commit は他環境で解決できないため)。
+開発 checkout を試すときだけ `--skill-source <ローカルパス>` を明示する。hooks / rules / agents のみなら
+タグなしでも導入できるが、hooks の runtime lock を後で復元するには同じソースが要るのでタグ checkout を推奨する。
 
 | フラグ | 導入内容 |
 |---|---|
