@@ -22,7 +22,42 @@ def test_install_rules_and_agents(tmp_path):
     assert list((tmp_path / ".claude" / "agents").glob("*.md"))
 
 
+def test_install_hooks_refuses_non_git_target(tmp_path):
+    # hook は Git 前提。非 Git ディレクトリでは何も書き込まずにメッセージを出して止まる。
+    # 他コンポーネントより先に判定し、部分導入を残さない。
+    result = run_install(tmp_path, "--hooks", "--rules")
+    assert result.returncode == 1
+    assert "git init" in result.stderr
+    assert "何も導入していません" in result.stderr
+    assert not (tmp_path / ".agent-kit").exists()
+    assert not (tmp_path / ".claude").exists()
+    assert not (tmp_path / ".codex").exists()
+
+
+def test_install_codex_refuses_non_git_target(tmp_path):
+    result = run_install(tmp_path, "--codex")
+    assert result.returncode == 1
+    assert "git init" in result.stderr
+    assert not (tmp_path / ".codex").exists()
+
+
+def test_install_hooks_refuses_subdirectory_target(tmp_path):
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
+    nested = tmp_path / "packages" / "app"
+    nested.mkdir(parents=True)
+    result = run_install(nested, "--hooks")
+    assert result.returncode == 1
+    assert "repository root" in result.stderr
+    assert not (nested / ".agent-kit").exists()
+
+
+def test_install_rules_without_git_still_works(tmp_path):
+    result = run_install(tmp_path, "--rules", "--agents")
+    assert result.returncode == 0, result.stderr
+
+
 def test_install_hooks_prints_wiring(tmp_path):
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
     result = run_install(tmp_path, "--hooks")
     assert result.returncode == 0, result.stderr
     assert (tmp_path / ".agent-kit/hooks.lock.json").exists()
@@ -30,6 +65,7 @@ def test_install_hooks_prints_wiring(tmp_path):
 
 
 def test_install_hooks_wiring_uses_standalone_bootstrap(tmp_path):
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
     result = run_install(tmp_path, "--hooks")
     assert result.returncode == 0, result.stderr
     assert "CLAUDE_PLUGIN_ROOT" not in result.stdout
@@ -208,6 +244,7 @@ def test_skill_source_defaults_to_exact_release_tag(tmp_path, monkeypatch, origi
     git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "unreleased")
     unpublished = tmp_path / "unpublished"
     unpublished.mkdir()
+    subprocess.run(["git", "init", str(unpublished)], check=True, capture_output=True)
     (kit / "rules").mkdir()
     (kit / "rules/test.md").write_text("replacement")
     existing = unpublished / ".claude/rules/test.md"
@@ -267,6 +304,7 @@ def test_codex_target_with_ampersand(tmp_path):
     # --codex で特殊文字を含むパスが正しく処理される
     target = tmp_path / "a&b"
     target.mkdir()
+    subprocess.run(["git", "init", str(target)], check=True, capture_output=True)
     result = run_install(target, "--codex")
     assert result.returncode == 0, result.stderr
     config = (target / ".codex" / "config.toml").read_text(encoding="utf-8")

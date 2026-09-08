@@ -52,6 +52,10 @@ python scripts/install_harness.py --target /path/to/consumer --codex
 python scripts/install_harness.py --target /path/to/consumer --runtime-only
 ```
 
+`--target` は Git repository の root でなければならない。Git repository でない場合や配下ディレクトリを
+指定した場合、installer は何も書き込まずに `ERROR:` を出して exit 1 する (runtime の共有先と lock の
+検出位置を Git で決めるため)。`git init` 後に再実行する。
+
 最初のコマンドは Claude 設定を表示し、Codex 設定を生成する。既存設定は `.new` へ提案し、
 固有 override と旧ファイルは保持する。表示された起動設定へ移行し、lock とともにコミットする。
 旧 `.claude/hooks/hook_*.py` / `.codex/hooks/hook_*.py` を直接登録する形式は移行対象。

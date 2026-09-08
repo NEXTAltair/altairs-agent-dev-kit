@@ -30,6 +30,8 @@ claude plugin install altairs-agent-dev-kit@altairs-agent-dev-kit
 明示していないのはデフォルト検出パスと完全一致するため二重指定を避けた設計)。
 
 hook を使うプロジェクトは Git repository が前提で、利用する kit 版の branch lock を事前に作成する。
+導入先が Git repository でない (または repository root でない) 場合、installer は何も書き込まずに
+メッセージを出して停止するので、先に `git init` を実行する。
 別途 clone した kit で `git checkout v0.3.0` を実行し、次を実行する (Linux は `python3`):
 
 ```text

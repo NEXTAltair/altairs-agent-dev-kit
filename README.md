@@ -48,6 +48,10 @@ git checkout v0.3.0
 `--hooks` はコピー後に `settings.json` へ配線すべき hook 設定を標準出力に表示するだけなので、
 表示された JSON を `<repo>/.claude/settings.json` の `hooks` キーへ手動で貼り付けること。
 
+`--hooks` / `--codex` の導入先は Git repository の root が前提 (runtime の版固定と worktree 判定に Git を使う)。
+Git repository でない場合や配下ディレクトリを指定した場合、installer は何も書き込まずにメッセージを出して停止する。
+先に `git init` を実行してから再実行すること。skills / rules / agents のみの導入に Git は不要。
+
 Windows PowerShell のフック導入には次を利用できる (Python 3.10+ と Git が必要):
 
 ```text

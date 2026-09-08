@@ -95,6 +95,38 @@ def test_installed_launchers_and_overrides(tmp_path):
                 assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
+def test_install_runtime_refuses_non_git_target(tmp_path):
+    from install_harness import install_runtime
+    target = tmp_path / "plain directory"
+    target.mkdir()
+    with pytest.raises(ValueError, match="git init"):
+        install_runtime(target)
+    assert not (target / ".agent-kit").exists()
+
+
+def test_install_runtime_refuses_nested_directory(tmp_path):
+    from install_harness import install_runtime
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
+    nested = tmp_path / "packages" / "app"
+    nested.mkdir(parents=True)
+    with pytest.raises(ValueError, match="repository root"):
+        install_runtime(nested)
+    assert not (nested / ".agent-kit").exists()
+    assert not (tmp_path / ".agent-kit").exists()
+
+
+def test_installer_cli_reports_non_git_target_without_traceback(tmp_path):
+    result = subprocess.run(
+        [sys.executable, "-X", "utf8", str(KIT / "scripts/install_harness.py"),
+         "--target", str(tmp_path), "--runtime-only"],
+        capture_output=True, text=True, encoding="utf-8", timeout=30,
+    )
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    assert result.stderr.startswith("ERROR:")
+    assert "git init" in result.stderr
+
+
 def test_runtime_failures_and_consumer_startup(tmp_path):
     from install_harness import hook_bootstrap, install_runtime
     target = tmp_path / "日本語 project"
@@ -229,6 +261,7 @@ def test_atomic_restore_and_branch_versions(tmp_path, monkeypatch):
 
 
 def test_reinstall_keeps_existing_config(tmp_path):
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
     install(tmp_path)
     config = tmp_path / ".codex/hooks.json"
     config.write_text('{"custom": true}', encoding="utf-8")
@@ -353,6 +386,7 @@ def test_tracked_adapter_and_consumer_use_branch_runtime(tmp_path):
 
 
 def test_consistency_detects_lost_inline_registrations(tmp_path):
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
     wiring = install(tmp_path)
     settings = tmp_path / ".claude/settings.json"
     settings.parent.mkdir()

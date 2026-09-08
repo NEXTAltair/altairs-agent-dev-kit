@@ -25,6 +25,20 @@ done
 [[ -n "$TARGET" && -d "$TARGET" ]] || { echo "--target <existing repo> が必要" >&2; exit 1; }
 TARGET="$(cd "$TARGET" && pwd)"
 
+# hook は runtime の版固定と worktree 判定を Git に依存する。Git repository でない導入先へ
+# 入れると起動契約が全ツール呼び出しを deny し、誤った復旧手順を案内してしまうため、
+# 何も書き込む前に止める。skills/rules/agents だけの導入は Git 不要。
+if [[ "$DO_HOOKS" -eq 1 || "$DO_CODEX" -eq 1 ]]; then
+  toplevel="$(git -C "$TARGET" rev-parse --show-toplevel 2>/dev/null)" || {
+    echo "ERROR: $TARGET は Git repository ではありません。--hooks / --codex は Git 前提です (runtime の版固定と worktree 判定に使用)。プロジェクトルートで git init を実行してから再実行してください。何も導入していません" >&2
+    exit 1
+  }
+  if [[ "$toplevel" != "$TARGET" ]]; then
+    echo "ERROR: --target は repository root ($toplevel) を指定してください。lock はそこでしか検出されません。何も導入していません" >&2
+    exit 1
+  fi
+fi
+
 copy_file() {  # copy_file <src> <dest>
   local src="$1" dest="$2"
   if [[ -e "$dest" && "$FORCE" -eq 0 ]]; then
