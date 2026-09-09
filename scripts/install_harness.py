@@ -124,6 +124,22 @@ def require_git_checkout(target: Path) -> Path:
     return top
 
 
+def require_uv() -> str:
+    """Refuse to install when uv is missing, before anything is written.
+
+    The kit targets Python/uv projects: the uv guard hook and the shared-venv rules
+    assume a global uv. Installing without it leaves rules that cannot be followed.
+    """
+    found = shutil.which("uv")
+    if found is None:
+        raise ValueError(
+            "`uv` was not found on PATH. This kit targets Python/uv projects; hooks and"
+            " rules assume uv is installed globally (https://docs.astral.sh/uv/)."
+            " Install uv, then rerun the installer. Nothing was installed."
+        )
+    return found
+
+
 def shared_checkout(target: Path) -> Path:
     """Locate the main checkout whose .agent-kit/runtimes/ this target shares."""
     require_git_checkout(target)
@@ -211,11 +227,15 @@ def main() -> None:
     parser.add_argument("--codex", action="store_true", help="Also install local Codex config and agents")
     parser.add_argument("--runtime-only", action="store_true", help="Restore runtime without changing event registrations")
     args = parser.parse_args()
+    target = args.target.resolve()
     try:
+        # Git first so the message order matches install.sh; both stop before any write.
+        require_git_checkout(target)
+        require_uv()
         if args.runtime_only:
-            install_runtime(args.target.resolve(), args.force)
+            install_runtime(target, args.force)
             return
-        wiring = install(args.target.resolve(), args.force, args.codex)
+        wiring = install(target, args.force, args.codex)
     except (ValueError, RuntimeError, FileExistsError) as error:
         raise SystemExit(f"ERROR: {error}") from error
     print("Merge this hooks object into .claude/settings.json:")

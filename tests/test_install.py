@@ -22,6 +22,35 @@ def test_install_rules_and_agents(tmp_path):
     assert list((tmp_path / ".claude" / "agents").glob("*.md"))
 
 
+def path_without_uv() -> str:
+    # uv が無い環境を再現する: uv を含む PATH エントリだけを落とす (bash / git / python3 は残す)。
+    return os.pathsep.join(
+        entry for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if entry and not any((Path(entry) / name).exists() for name in ("uv", "uv.exe"))
+    )
+
+
+def test_install_refuses_without_uv(tmp_path):
+    # kit 全体が Python/uv 前提。uv が無ければ --rules だけでも何も書かずに止める (非 Git と同じ挙動)。
+    env = {**os.environ, "PATH": path_without_uv()}
+    result = subprocess.run(["bash", str(KIT / "install.sh"), "--target", str(tmp_path), "--rules", "--agents"],
+                            capture_output=True, text=True, timeout=30, env=env)
+    assert result.returncode == 1
+    assert "uv" in result.stderr
+    assert "何も導入していません" in result.stderr
+    assert not (tmp_path / ".claude").exists()
+
+
+def test_install_git_error_precedes_uv_error(tmp_path):
+    # 判定順は Git → uv。非 Git かつ uv 無しでは git init の案内が先に出る。
+    env = {**os.environ, "PATH": path_without_uv()}
+    result = subprocess.run(["bash", str(KIT / "install.sh"), "--target", str(tmp_path), "--hooks"],
+                            capture_output=True, text=True, timeout=30, env=env)
+    assert result.returncode == 1
+    assert "git init" in result.stderr
+    assert not (tmp_path / ".agent-kit").exists()
+
+
 def test_install_hooks_refuses_non_git_target(tmp_path):
     # hook は Git 前提。非 Git ディレクトリでは何も書き込まずにメッセージを出して止まる。
     # 他コンポーネントより先に判定し、部分導入を残さない。
@@ -95,6 +124,8 @@ def test_install_skills_requires_npx(tmp_path):
     isolated_bin = tmp_path / "bin"
     isolated_bin.mkdir()
     (isolated_bin / "dirname").symlink_to(shutil.which("dirname"))
+    # uv は kit 全体の前提として npx より先に検査されるので、ここでは満たしておく。
+    (isolated_bin / "uv").symlink_to(shutil.which("uv"))
     result = subprocess.run(
         [shutil.which("bash"), str(KIT / "install.sh"), "--target", str(tmp_path), "--skills"],
         capture_output=True, text=True, timeout=30,

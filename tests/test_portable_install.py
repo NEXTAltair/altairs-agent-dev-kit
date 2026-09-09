@@ -127,6 +127,26 @@ def test_installer_cli_reports_non_git_target_without_traceback(tmp_path):
     assert "git init" in result.stderr
 
 
+def test_installer_cli_refuses_missing_uv(tmp_path):
+    # uv はグローバル前提。Git 検査を通った後、何も書く前に uv 不在で止まる (Windows でも同じ)。
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
+    path = os.pathsep.join(
+        entry for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if entry and not any((Path(entry) / name).exists() for name in ("uv", "uv.exe"))
+    )
+    result = subprocess.run(
+        [sys.executable, "-X", "utf8", str(KIT / "scripts/install_harness.py"),
+         "--target", str(tmp_path), "--runtime-only"],
+        capture_output=True, text=True, encoding="utf-8", timeout=30,
+        env={**os.environ, "PATH": path},
+    )
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    assert result.stderr.startswith("ERROR:")
+    assert "uv" in result.stderr
+    assert not (tmp_path / ".agent-kit").exists()
+
+
 def test_runtime_failures_and_consumer_startup(tmp_path):
     from install_harness import hook_bootstrap, install_runtime
     target = tmp_path / "日本語 project"

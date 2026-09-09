@@ -11,6 +11,10 @@ timestamp: 2026-07-02
 
 ## 1. 導入経路
 
+いずれの経路も **uv がグローバルに導入されていること** を前提とする (hook の uv ガード、rules の共有 venv
+運用が uv 前提のため)。uv が PATH に無い場合、`install.sh` と `scripts/install_harness.py` は Git repository
+でない場合と同じく何も書き込まずに停止するので、先に [uv](https://docs.astral.sh/uv/) を導入する。
+
 まず経路C (`install.sh --all`) を使えばよい。経路A/B は以下のような個別ニーズがある場合の
 選択肢: 経路A は Claude Code のプラグイン機構による hook 自動配線が欲しい場合、経路B は
 skill を 1 本だけ他 kit と混在導入したい場合に向く。
@@ -32,7 +36,7 @@ claude plugin install altairs-agent-dev-kit@altairs-agent-dev-kit
 hook を使うプロジェクトは Git repository が前提で、利用する kit 版の branch lock を事前に作成する。
 導入先が Git repository でない (または repository root でない) 場合、installer は何も書き込まずに
 メッセージを出して停止するので、先に `git init` を実行する。
-別途 clone した kit で `git checkout v0.3.2` を実行し、次を実行する (Linux は `python3`):
+別途 clone した kit で `git checkout v0.3.3` を実行し、次を実行する (Linux は `python3`):
 
 ```text
 python -X utf8 scripts/install_harness.py --target <project-directory> --runtime-only
@@ -49,9 +53,9 @@ plugin 更新でソースが変わっても branch pin は維持される。版�
 skill を 1 本ずつ選んで導入したい場合:
 
 ```bash
-npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.2" --skill check-existing
-npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.2" --skill pr-maintainer
-npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.2" --skill okf-bundle
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.3" --skill check-existing
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.3" --skill pr-maintainer
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.3" --skill okf-bundle
 ```
 
 `skills/<name>/SKILL.md` が skills.sh の標準配置と一致しているため、任意の skill 名を
@@ -65,7 +69,7 @@ skills / rules / agents / hooks / Codex 設定をこれ 1 本で導入できる�
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
-git checkout v0.3.2
+git checkout v0.3.3
 ./install.sh --target /path/to/your-repo --all
 ```
 

@@ -39,6 +39,13 @@ if [[ "$DO_HOOKS" -eq 1 || "$DO_CODEX" -eq 1 ]]; then
   fi
 fi
 
+# kit 全体が Python/uv プロジェクト前提 (hook の uv ガード、rules の共有 venv 運用)。
+# uv がグローバルに無い環境へ入れても機能しないので、Git と同様に何も書く前に止める。
+command -v uv >/dev/null 2>&1 || {
+  echo "ERROR: uv が見つかりません。この kit は Python/uv プロジェクト向けで、hook / rules が uv を前提にしています。https://docs.astral.sh/uv/ に従いグローバルにインストールしてから再実行してください。何も導入していません" >&2
+  exit 1
+}
+
 copy_file() {  # copy_file <src> <dest>
   local src="$1" dest="$2"
   if [[ -e "$dest" && "$FORCE" -eq 0 ]]; then

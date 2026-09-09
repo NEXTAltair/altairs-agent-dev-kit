@@ -30,9 +30,13 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
-git checkout v0.3.2
+git checkout v0.3.3
 ./install.sh --target /path/to/your-repo --all
 ```
+
+**uv がグローバルに導入されていることが前提** (hook の uv ガード、rules の共有 venv 運用が uv を前提とするため)。
+uv が PATH に無い場合、install.sh / install_harness.py は Git repository でない場合と同様に、何も書き込まずに
+メッセージを出して停止する。[uv の導入手順](https://docs.astral.sh/uv/) に従って導入してから再実行すること。
 
 タグの checkout が必要なのは `--skills` を含む場合で、skills.sh CLI の制約ではなくこの kit のポリシー。
 install.sh は checkout 中のタグを `github:owner/repo#<tag>` として `skills-lock.json` に記録するため、

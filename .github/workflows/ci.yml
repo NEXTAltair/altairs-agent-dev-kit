@@ -15,6 +15,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      # installer は uv をグローバル前提として検査する。hook 自体は plain python で動かす。
+      - uses: astral-sh/setup-uv@v5
       - run: python -m pip install pytest
       - run: python -X utf8 -m pytest tests/test_hook_portability.py tests/test_portable_install.py -v
   test:
