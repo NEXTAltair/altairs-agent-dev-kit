@@ -26,6 +26,28 @@ def test_git_reset_hard_blocked(tmp_path):
     assert reason and "危険" in reason
 
 
+def test_recursive_rm_blocked_only_for_irreversible_targets(tmp_path):
+    """rm -rf は日常の生成物掃除に使うので全面ブロックしない。
+    巻き戻し不能な対象 (/, ~, $HOME, 上位ディレクトリ, 裸の *, .git, .venv) だけ deny する。"""
+    for command in [
+        "rm -rf /", "rm -rf /*", "rm -rf ~", "rm -rf $HOME/", "rm -rf ..", "rm -rf ../sibling",
+        "rm -rf *", "rm -rf ./*", "rm -rf .git", "rm -rf .venv", "rm -fr .git", "rm -r --force .venv",
+        "sudo rm -rf /", "cd x && rm -rf ../y", "rm -rf build ..",
+    ]:
+        reason = pretooluse_deny_reason(run_hook(command, tmp_path))
+        assert reason and "巻き戻し不能" in reason, command
+
+
+def test_recursive_rm_allowed_for_project_artifacts(tmp_path):
+    for command in [
+        "rm -rf build", "rm -rf node_modules dist", "rm -rf .agents/worktree/x", "rm -rf /tmp/claude-1000/foo",
+        "rm -rf ./build", "rm -f file.txt", "rm -rf src/.venv", "rm -rf .git/index.lock", "rm -rf ~/src/proj/build",
+        "rm -rf $HOME/.cache/uv", "rm -rf dist/*", "rm -rf .venv-old",
+    ]:
+        result = run_hook(command, tmp_path)
+        assert result.returncode == 0 and pretooluse_deny_reason(result) is None, command
+
+
 def test_normal_command_allowed(tmp_path):
     result = run_hook("ls -la", tmp_path)
     assert result.returncode == 0

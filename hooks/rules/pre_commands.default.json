@@ -1,7 +1,7 @@
 {
   "description": "汎用デフォルト: 破壊的コマンドのブロック (言語非依存)",
   "blocked_commands": [
-    {"pattern": "^rm\\s+-rf\\s+.+", "reason": "破壊的操作", "suggestion": "対象を確認しユーザーに確認を取ってください"},
+    {"pattern": "(^|[\\s;&|])(?:sudo\\s+)?rm\\s+(?:\\S+\\s+)*?(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\\s+(?:\\S+\\s+)*?(?:/\\*?|~/?|\\$HOME/?|\\.\\.(?:/\\S*)?|(?:\\./)?\\*|\\.git/?|\\.venv/?)(?=\\s|$|[;&|])", "reason": "【危険】巻き戻し不能な対象 (/, ~, $HOME, .., 裸の *, .git, .venv) への再帰削除です", "suggestion": "削除対象をプロジェクト内の生成物 (build, dist, node_modules 等) に限定するか、ユーザーに確認"},
     {"pattern": "git\\s+filter-repo", "reason": "【危険】ワーキングディレクトリのファイルも削除されます", "suggestion": "git rm --cached + .gitignore を検討。履歴削除が必要かユーザーに確認"},
     {"pattern": "git\\s+reset\\s+--hard", "reason": "【危険】未コミットの全変更を永久に消去します", "suggestion": "git stash で退避するかユーザーに確認"},
     {"pattern": "git\\s+push\\s+(.*\\s)?(-f|--force)(?!-with-lease)", "reason": "【危険】リモート履歴を強制上書きします", "suggestion": "git push --force-with-lease を使うかユーザーに確認"},
