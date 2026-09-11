@@ -17,8 +17,8 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 
 | 種別 | 数 | 場所 |
 |---|---|---|
-| skills | 14 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
-| rules | 10 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守等) |
+| skills | 15 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
+| rules | 11 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守・問題解決の姿勢等) |
 | hooks | 5 本 + 共通基盤 | `hooks/scripts/*.py` (+ `hook_common.py`)、設定は `hooks/rules/*.default.json` |
 | agents | 10 本 | `agents/*.md` (Claude Code サブエージェント定義) |
 | Codex 設定 | 一式 | `codex/config.toml.template`, `codex/agents/*.toml` |
@@ -30,7 +30,7 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
-git checkout v0.3.3
+git checkout v0.4.0
 ./install.sh --target /path/to/your-repo --all
 ```
 

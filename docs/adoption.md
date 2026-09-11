@@ -36,7 +36,7 @@ claude plugin install altairs-agent-dev-kit@altairs-agent-dev-kit
 hook を使うプロジェクトは Git repository が前提で、利用する kit 版の branch lock を事前に作成する。
 導入先が Git repository でない (または repository root でない) 場合、installer は何も書き込まずに
 メッセージを出して停止するので、先に `git init` を実行する。
-別途 clone した kit で `git checkout v0.3.3` を実行し、次を実行する (Linux は `python3`):
+別途 clone した kit で `git checkout v0.4.0` を実行し、次を実行する (Linux は `python3`):
 
 ```text
 python -X utf8 scripts/install_harness.py --target <project-directory> --runtime-only
@@ -53,9 +53,9 @@ plugin 更新でソースが変わっても branch pin は維持される。版�
 skill を 1 本ずつ選んで導入したい場合:
 
 ```bash
-npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.3" --skill check-existing
-npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.3" --skill pr-maintainer
-npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.3.3" --skill okf-bundle
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.4.0" --skill check-existing
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.4.0" --skill pr-maintainer
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.4.0" --skill okf-bundle
 ```
 
 `skills/<name>/SKILL.md` が skills.sh の標準配置と一致しているため、任意の skill 名を
@@ -69,7 +69,7 @@ skills / rules / agents / hooks / Codex 設定をこれ 1 本で導入できる�
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
-git checkout v0.3.3
+git checkout v0.4.0
 ./install.sh --target /path/to/your-repo --all
 ```
 
