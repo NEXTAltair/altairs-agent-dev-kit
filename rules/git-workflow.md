@@ -38,6 +38,8 @@ git worktree add .agents/worktree/issue-123 -b fix/issue-123 origin/main
 ローカル実装だけで作業を終えない。PR URL と最終監視状態を成果として報告する。auth / network / 検証失敗 / スコープ不明で PR 起票がブロックされた場合は、黙ってローカル変更で止めず blocker を明示する。
 
 > 注: kit の worktree 作成 hook (`hook_worktree_create.py`) は自動 worktree 作成を仲介する。手動 `git worktree add` も fallback として有効。
+> 初期設定 (.gitignore / VS Code 検出設定)、hook にブロックされた後の復帰、並列 worker への割当、merge 後の掃除までの
+> 具体的なコマンド手順は `worktree-workflow` skill (導入していれば) に集約している。本ファイルは方針のみを定める。
 
 ### PR 保守自走の枠組み
 
