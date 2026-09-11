@@ -14,6 +14,6 @@
 * [docs-freshness-audit skill 設計](superpowers/specs/2026-07-05-docs-freshness-audit-skill-design.md)
 * [導入ガイド](adoption.md) — skills / rules / hooks / agents / Codex 設定を任意リポジトリへ導入する3経路と設定上書き方法
 * [Hook runtime の固定・復元契約](hook-runtime.md) — 作業 checkout の lock と override、共有 runtime、起動・復元失敗の扱い
-* [portable-hooks](portable-hooks.md)
-* [skill-install-runbook](skill-install-runbook.md)
+* [Portable hooks](portable-hooks.md) — kit が hook の共通ポリシーを持ち、導入先は override JSON とイベント登録だけを保持する配布モデルと、Claude / Codex 向け配線の説明
+* [skill 導入 / 更新 runbook](skill-install-runbook.md) — kit の skill を consumer リポジトリへ導入・更新する手順と、その裏にある配布モデル (canonical レイアウト・pin・更新経路)
 * [サードパーティ skills](third-party-skills.md) — 本 kit に同梱しないサードパーティ skill の npx skills add インストールリスト

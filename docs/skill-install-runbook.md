@@ -1,3 +1,9 @@
+---
+type: Runbook
+title: skill 導入 / 更新 runbook
+description: kit の skill を consumer リポジトリへ導入・更新する手順と、その裏にある配布モデル (canonical レイアウト・pin・更新経路)
+timestamp: 2026-09-11
+---
 # skill 導入 / 更新 runbook
 
 kit の skill を consumer リポジトリへ導入・更新する際の手順と、その裏にある配布モデルをまとめる。

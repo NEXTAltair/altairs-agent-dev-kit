@@ -33,7 +33,22 @@
 「メタデータが正しいか」だけを確認する。これにより、索引の drift (メタデータと索引の不一致) が
 構造的に起こらなくなる。
 
-具体的な運用パターン (概念ドキュメントの frontmatter 管理・索引再生成) は `okf-bundle` skill を参照。
+具体的な運用パターン (frontmatter 管理・索引再生成) は `okf-bundle` skill を参照。
+
+## エージェントが読む開発ドキュメントは OKF バンドルとして記録する
+
+詳細層のうち、**エージェントが後で読む前提の開発中ドキュメント** (設計書、仕様、実装計画、調査メモ、
+検証記録、手順書、教訓、ADR、用語集など) は、種類を問わず frontmatter 付きの Markdown として
+ドキュメントルート配下に置き、索引を生成物として保つ。
+
+- frontmatter の `type` は必須。`title` / `description` / `timestamp` / `status` は推奨。
+- 状態 (draft / active / superseded 等) や日付のようなスカラー値は frontmatter に置き、本文の散文に書かない。
+- 新規作成時は本文より先に frontmatter を書く。frontmatter の無い開発ドキュメントを新たに増やさない。
+- 既存の frontmatter 無し文書は段階的に付与する (検証は `--skip-missing` で未付与を除外できる)。
+- 索引 (`index.md`) は生成物。文書を追加・編集したら再生成し、手で編集しない。
+
+対象外は README (人間向け入口)、指針層 (`CLAUDE.md` / `AGENTS.md`)、生成物、コードコメント。
+手順と検証スクリプトは `okf-bundle` skill を参照。
 
 ## ドキュメントの正確性は「参照が減るほど保たれる」
 

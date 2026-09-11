@@ -1,6 +1,6 @@
 ---
 name: okf-bundle
-description: "Maintain a directory of markdown docs as an Open Knowledge Format (OKF) bundle in any project: ensure each concept file has valid OKF frontmatter (required `type`, plus optional title/description/tags/timestamp), keep frontmatter the single source of truth, and regenerate the derived index.md (and an optional human-readable table) from it. Use when adding/editing concept docs (ADRs, knowledge bases, glossaries) or when a bundle's index looks stale. Project-specific drift detection stays in the project."
+description: "Record every agent-facing development document as part of an Open Knowledge Format (OKF) bundle: design docs, plans, investigation notes, runbooks, specs, lessons-learned, ADRs, glossaries, knowledge bases. Ensure each markdown file has OKF frontmatter (required type, plus title/description/tags/timestamp/status), keep frontmatter the single source of truth, and regenerate the derived index.md (and optional table) from it. Use whenever creating or editing any markdown under docs/ (or the project's doc root) that an agent will read later, when asked to 「ドキュメント書いて」「設計書」「調査メモ」「runbook」「ADR」, or when an index looks stale. Do NOT use for: README / CLAUDE.md / AGENTS.md (guidance layer), generated files, or code comments."
 metadata:
   short-description: 任意プロジェクトの md 群を OKF バンドルとして保守（frontmatter=SSoT → index/表を生成・検証）。
 ---
@@ -13,6 +13,40 @@ Markdown ファイルのディレクトリを [Open Knowledge Format (OKF)](http
 
 プロジェクト非依存・stdlib only。`--bundle-root` で対象ディレクトリを受け取るので、
 ADR・知識ベース・用語集など任意の OKF バンドルに使える。
+
+## 対象: エージェントが読む開発ドキュメントすべて
+
+ADR や用語集に限らない。**エージェントが後で読む前提で書く開発中ドキュメントは、種類を問わず
+この方式で記録する。** 対象の例:
+
+| 種類 | `type` の例 | 典型的な置き場 |
+|---|---|---|
+| 設計判断 | `ADR` | `docs/decisions/` |
+| 設計書・仕様 | `Design`, `Spec` | `docs/design/`, `docs/specs/` |
+| 実装計画・タスク分解 | `Plan` | `docs/plans/` |
+| 調査メモ・検証記録 | `Investigation`, `Experiment` | `docs/investigations/` |
+| 手順書 | `Runbook`, `Guide` | `docs/` |
+| 参照資料・一覧 | `Reference` | `docs/` |
+| 教訓・バグパターン | `Lesson` | `docs/lessons-learned/` |
+| 用語集・概念 | `Concept`, `Glossary` | `docs/knowledge/` |
+
+`type` の語彙はプロジェクトで固定してよいが、**新しい文書に frontmatter を付けない選択肢は無い**。
+対象外は README (人間向け入口)、`CLAUDE.md` / `AGENTS.md` (指針層)、生成物 (`index.md` 等)、コードコメント。
+
+frontmatter に置く推奨キー:
+
+```yaml
+---
+type: Investigation
+title: 短い題名
+description: 一文の要約 (索引にそのまま出る)
+timestamp: 2026-01-01        # ISO 8601。最終更新日
+status: draft | active | superseded   # 状態はここ。本文の散文に書かない
+tags: [hooks, uv]
+---
+```
+
+新しい文書を作るときは、本文より先に frontmatter を書く。既存文書を大きく編集したら `timestamp` を更新する。
 
 ## OKF の必須ルール (SPEC v0.1)
 
@@ -42,7 +76,7 @@ ADR・知識ベース・用語集など任意の OKF バンドルに使える。
 
 ## Workflow (Agent が判断で起動)
 
-概念ドキュメントを追加・編集・改番したら:
+対象ドキュメントを追加・編集・改番したら:
 
 1. **検証**: `python3 <skill>/scripts/okf_validate.py --bundle-root <DIR> [--exclude README.md]`
    — frontmatter 欠落や必須キー漏れを補う。

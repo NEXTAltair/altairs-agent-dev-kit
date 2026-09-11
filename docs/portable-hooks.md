@@ -1,3 +1,9 @@
+---
+type: Guide
+title: Portable hooks
+description: kit が hook の共通ポリシーを持ち、導入先は override JSON とイベント登録だけを保持する配布モデルと、Claude / Codex 向け配線の説明
+timestamp: 2026-09-11
+---
 # Portable hooks
 
 Common hook policy belongs to this kit. Consuming repositories keep their own
