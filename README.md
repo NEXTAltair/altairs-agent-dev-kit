@@ -30,7 +30,7 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
-git checkout v0.4.0
+git checkout v0.5.0
 ./install.sh --target /path/to/your-repo --all
 ```
 
