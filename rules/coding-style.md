@@ -1,148 +1,129 @@
 # Coding Style Rules
 
-一貫性のある保守しやすいコードベースを維持するための、実装コードのスタイル原則。コード例は Python (型ヒント / Ruff / mypy) を前提にしているが、命名規則・エラーハンドリング方針・ドキュメント方針は言語非依存で流用できる。
+実装コードのスタイルは、散文のルールではなく Ruff / mypy の設定で定義する。型ヒントの構文、
+import 順序、行長、命名の形式 (snake_case 等)、全角文字の混入のような機械で検出できる事項は
+ここに書かず、設定と lint 結果に委ねる。本ファイルが持つのは次の 3 つだけ:
 
-> **プロジェクト固有:** 使用言語、フォーマッタ/リンタ (Ruff, ESLint, Prettier 等) の設定、最大行長、型チェッカーの実行コマンドは導入先で追記する。
+1. `pyproject.toml` に置く lint / 型チェック設定 (セキュリティ系の `S` rule を含む。判断事項は [security.md](security.md))
+2. lint 結果の扱い方 (commit 前に直す、抑制しない)
+3. lint では決まらない設計判断 (言語、例外方針、命名の具体性)
 
-## 型ヒント
+> **プロジェクト固有:** `target-version` / `python_version` は導入先の Python 版に、`exclude` と
+> `per-file-ignores` は導入先の構成に合わせる。Ruff の rule 選択と format 設定は個人の好みとして
+> 育てたもので、プロジェクト依存度は低いのでそのまま使ってよい。
 
-### 必須
-- 全関数/メソッドに型ヒントを付ける
-- 引数と戻り値の両方を指定
+## lint / 型チェック設定
 
-### モダンな構文を使う
-```python
-# 正しい: 標準コレクション型 (Python 3.10+)
-def process_items(items: list[str]) -> dict[str, int]:
-    ...
+以下を導入先の `pyproject.toml` に置く。
 
-def get_value(key: str) -> str | None:
-    ...
+```toml
+[tool.ruff]
+# check は read-only。自動修正は `ruff check --fix` を明示したときだけ
+fix = false
+line-length = 108
+target-version = "py312"
+exclude = [
+    "*/gui/designer/*",  # Qt Designer が生成するコード
+    "*/__pycache__",
+]
 
-# 禁止: typing モジュールの旧構文
-from typing import List, Dict, Optional
-def process_items(items: List[str]) -> Dict[str, int]:  # 使わない
-    ...
+[tool.ruff.lint]
+fixable = ["ALL"]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C4",  # flake8-comprehensions
+    "C90", # McCabe complexity
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade (list[str], X | None 等のモダン構文へ寄せる)
+    "RUF", # Ruff 固有 (全角記号の混入検出 RUF001-003 を含む)
+    "S",   # flake8-bandit (eval/exec, pickle, shell=True, ハードコード秘密, SQL 連結。security.md 参照)
+]
+ignore = [
+    "E501", # 行長は line-length と formatter で制御
+    "B008", # typer.Option/Argument を関数デフォルトに置く typer 標準パターン
+]
+# 日本語表記として自然な文字だけ confusable 警告から除外する。
+# 残る全角記号 (: = + ! ? - 等) は RUF001/002/003 で検出し半角化させる
+allowed-confusables = ["ノ", "(", ")", "×"]
+
+[tool.ruff.lint.per-file-ignores]
+# テストでは assert (S101) を使う
+"tests/**" = ["S101"]
+# 例: モックを先に設定してから import する必要がある conftest は E402 を意図的に許可する。
+# 導入先で理由をコメント付きで追記する
+# "tests/conftest.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.mypy]
+strict = true              # 全関数の型ヒント必須、Any の暗黙利用禁止を含む
+python_version = "3.12"
+ignore_missing_imports = true
+exclude = ['^src/[^/]+/gui/designer/', '^tests/']
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+follow_imports = "skip"
 ```
 
-### Any型の回避
+## lint 結果の扱い
+
+- commit 前に `uv run ruff check`、`uv run ruff format`、`uv run mypy` を通す。指摘が残った状態で commit しない。
+- 指摘は根本原因を直す。`# noqa` / `# type: ignore` で抑制しない。例外的に必要な場合は rule code を
+  限定し、理由を同じ行に書く。
+
 ```python
 # 禁止
-def process(data: Any) -> Any:
-    ...
+result = some_function()  # type: ignore
+result = some_function()  # noqa
 
-# 正しい: 具体的な型を使用
-def process(data: RequestPayload) -> ProcessResult:
-    ...
-
-# やむを得ない場合はコメントで理由を説明
-def dynamic_load(config: Any) -> None:  # Any使用: 外部JSONスキーマが不定
-    ...
+# 例外: rule code を限定し理由を書く
+result = external_lib.call()  # type: ignore[no-any-return]  # 外部ライブラリの型定義が不完全
 ```
 
-## docstring
+- 設定側を緩めて通すのは、`per-file-ignores` にコメント付きで理由を書ける場合に限る。`select` から
+  rule group を外す、`fail_under` を下げる、`strict` を切るといった全体を緩める変更はしない。
+- 自動修正 (`ruff check --fix`) を使う場合は、何が変わったかを diff で確認してから commit する。
 
-### Google-style必須
+## 言語
+
+- docstring・コメント・エラーメッセージ・ログは日本語で書く。国際的な公開を前提にしない。
+- docstring は Google 形式 (Args / Returns / Raises)。
+
 ```python
 def calculate_score(item: Item, model: str) -> float:
     """対象の品質スコアを計算する。
 
-    指定されたモデルを使用して対象を評価し、
-    0.0から1.0の範囲でスコアを返す。
-
     Args:
         item: 評価対象のオブジェクト。
         model: 使用する評価モデルの名前。
-            "aesthetic": 美的評価
-            "technical": 技術的品質評価
 
     Returns:
-        0.0から1.0の範囲の品質スコア。
+        0.0 から 1.0 の範囲の品質スコア。
 
     Raises:
         ValueError: 未知のモデル名が指定された場合。
-        ProcessingError: 対象の読み込みに失敗した場合。
     """
-    ...
 ```
 
-## import
+## エラーハンドリング (Manager / Service 層)
 
-### 順序
-1. 標準ライブラリ
-2. サードパーティ
-3. ローカルアプリケーション
+Repository を薄くラップする Manager / Service 層では、「見つからない」と「失敗した」を区別する。
 
-```python
-# 標準ライブラリ
-import os
-from pathlib import Path
+- **期待される「見つからない」は正常系**: `NoResultFound` のような「対象が存在しない」例外は
+  `return None / [] / 0` に変換してよい。
+- **予期しない例外は握りつぶさない**: DB 接続エラーなどを `None` で返すと呼び出し元が気づけない。
+  ログを残して `raise`、または `raise XxxError from e` で伝播させる。
+- `except Exception` を書きたくなったら設計を見直す。
 
-# サードパーティ
-from sqlalchemy.orm import Session
-
-# ローカル
-from app.services import ItemService
-from app.database import Repository
-```
-
-### pathlib使用 (Python の場合)
-```python
-# 正しい
-from pathlib import Path
-path = Path("data") / "items" / "sample.png"
-
-# 禁止
-import os
-path = os.path.join("data", "items", "sample.png")
-```
-
-## エラーハンドリング
-
-### 具体的な例外
-```python
-# 正しい: 具体的な例外をキャッチ
-try:
-    with open(path) as f:
-        data = f.read()
-except FileNotFoundError:
-    logger.warning(f"File not found: {path}")
-    return None
-except PermissionError:
-    raise ConfigurationError(f"Cannot read file: {path}")
-
-# 禁止: 広範なExceptionキャッチ
-try:
-    ...
-except Exception:  # 避ける
-    pass
-```
-
-### Manager / Service 層のエラーハンドリング方針
-
-Repository を薄くラップする Manager/Service 層では以下のルールに従う:
-
-**許可: 期待される「見つからない」ケースに `return None/[]/0`**
-```python
-# 正しい: 「存在しない」は正常系扱い
-def get_item(self, item_id: int) -> ItemRecord | None:
-    try:
-        return self.item_repo.get_by_id(item_id)
-    except NoResultFound:
-        return None
-```
-
-**禁止: 予期しない例外を握りつぶす**
-```python
-# 禁止: DB 接続エラーを None で返すと呼び出し元が気づけない
-def get_item(self, item_id: int) -> ItemRecord | None:
-    try:
-        return self.item_repo.get_by_id(item_id)
-    except Exception:  # SQLAlchemyError も OperationalError も一括で隠す
-        return None
-```
-
-**正しいパターン:**
 ```python
 def get_item(self, item_id: int) -> ItemRecord | None:
     try:
@@ -154,111 +135,23 @@ def get_item(self, item_id: int) -> ItemRecord | None:
         raise               # 予期しない DB エラーは伝播させる
 ```
 
-**判断フロー:**
-1. この例外は「対象が存在しない」という正常な結果か? → `return None/[]/0`
-2. 呼び出し元が例外を知らないと問題になるか? → `raise` または `raise XxxError from e`
-3. `except Exception` を書きたくなったら設計を見直す
+## 命名: 具体的な名詞を使う
 
-### 抑制コメント禁止
-```python
-# 禁止: 根本原因を修正すること
-result = some_function()  # type: ignore
-result = some_function()  # noqa
+対象を問わず何にでも当てはまる総称語は、実体を指していない。「その語だけを見て、指している実体を
+他人が特定できるか」を基準にし、特定できなければ総称語を疑う。
 
-# 例外的に必要な場合は理由を詳細に記載
-result = external_lib.call()  # type: ignore[no-any-return]  # 外部ライブラリの型定義が不完全
-```
+- **コード識別子**: `Loader` / `Handler` / `data` / `n` のような語ではなく、`ItemProcessor` /
+  `DatabaseRepository` / `selected_tags` / `item_count` のように何を扱うかを言い当てる。
+- **ドキュメント・コメント・説明文の用語も同じ原則に従う**: 「台帳」「マネージャー」「データ」の
+  ような総称語は、何を記録・管理する何なのかを言い当てる語 (工程表、タスク進捗表、実行履歴レジストリ 等)
+  に置き換える。
 
-## 命名規則
+## TODO 管理
 
-### クラス名
-- 具体的な名詞を使用
-- 抽象的な名前を避ける
-
-```python
-# 正しい
-class ItemProcessor:
-    ...
-class DatabaseRepository:
-    ...
-
-# 禁止
-class Loader:  # 何をロードするか不明
-    ...
-class Handler:  # 何を処理するか不明
-    ...
-```
-
-### 変数名
-- スネークケース使用 (言語の慣習に従う)
-- 意味のある名前
-
-```python
-# 正しい
-item_count = 10
-selected_tags: list[str] = []
-
-# 禁止
-n = 10  # 意味不明
-lst = []  # 型情報なし
-```
-
-## 文字幅
-
-### 半角文字のみ
-- コード中のアルファベット、数字、記号は半角のみ
-- 全角英数字・記号は使用禁止
-
-```python
-# 正しい
-value = 123
-message = "Hello"
-
-# 禁止
-value = １２３  # 全角数字
-message = "Ｈｅｌｌｏ"  # 全角英字
-```
-
-## コメント
-
-### 日本語可
-- 実装コメントは日本語で記載可能
-- ただしdocstringの形式は英語推奨
-
-```python
-def process_item(item: Item) -> ProcessedItem:
-    """Process the item with enhancement filters."""
-    # リサイズ処理
-    resized = resize(item)
-
-    # 補正を適用
-    corrected = apply_correction(resized)
-
-    return corrected
-```
-
-### TODO管理
-課題管理システム (Issue tracker 等) の識別子を残し、後から追跡できるようにする。
+課題管理システムの識別子を残し、後から追跡できるようにする。
 
 ```python
 # TODO: <issue-id> - バッチ処理の最適化
 # FIXME: <issue-id> 参照 - メモリリークの修正
 # PENDING: 仕様確定待ち - フィルタ条件の拡張
-```
-
-## 行長
-
-- **最大行長はプロジェクトの lint 設定に従う** (目安: 100〜120文字)
-- 長い行は適切に改行
-
-```python
-# 正しい: 改行で読みやすく
-result = some_very_long_function_name(
-    first_argument,
-    second_argument,
-    third_argument,
-)
-
-# 禁止: 1行に詰め込む
-result = some_very_long_function_name(first_argument, second_argument, third_argument, fourth_argument)
 ```

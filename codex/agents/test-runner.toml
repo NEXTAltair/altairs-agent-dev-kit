@@ -57,10 +57,8 @@ uv run pytest --cov=src --cov-report=xml
 
 ## 役割分担
 
-- **test-runner**: テスト実行・失敗の報告に特化
-- **build-error-resolver**: 失敗の詳細な診断と修正提案を担当
-
-修正提案が必要な場合は build-error-resolver に委ねること。
+- **test-runner**: テスト実行・失敗の報告に特化。修正は行わず、失敗の原因候補と対象箇所を報告して
+  呼び出し元 (実装担当) に委ねる
 
 ## テスト環境 (例)
 

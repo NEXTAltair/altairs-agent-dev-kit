@@ -1,102 +1,36 @@
 # Security Rules
 
-コミット前に必ず確認すべき、実装コードのセキュリティガイドライン。
+実装コードのセキュリティは、散文の禁止リストではなく Ruff の `S` (flake8-bandit) で検出する。
+`eval` / `exec` (S102, S307)、`pickle.load` (S301)、`shell=True` / `os.system` (S602, S605)、
+`yaml.load` の SafeLoader 無し (S506)、ハードコードされたパスワード (S105-S107)、
+SQL 文字列連結 (S608) はすべて lint で止まる。設定は [coding-style.md](coding-style.md) の
+`select` に含めてあり、指摘の扱いも同ファイルの「lint 結果の扱い」に従う (抑制しない、
+例外は rule code を限定して理由を書く)。
 
-## API Key管理
+本ファイルが持つのは lint では決まらない判断だけ。
 
-### 必須事項
-- **ハードコード禁止**: API Keyをソースコードに直接記述しない
-- **環境変数経由**: すべての機密情報は環境変数から取得
-- **.gitignore必須**: `.env`ファイルは必ず`.gitignore`に含める
+## 機密情報
 
-### 正しいパターン
-```python
-import os
+- API key や token はソースに書かず環境変数から読む。未設定なら起動時に明示的に失敗させる
+  (黙ってフォールバックしない)。
+- `.env` は `.gitignore` に含める。サンプルは `.env.example` として値を空にして置く。
 
-# 環境変数から取得
-api_key = os.environ.get("OPENAI_API_KEY")
-if not api_key:
-    raise ValueError("OPENAI_API_KEY environment variable is required")
-```
+## ユーザー入力
 
-### 禁止パターン
-```python
-# これらは絶対に行わない
-api_key = "sk-..."  # ハードコード
-api_key = "your-api-key-here"  # プレースホルダー残存
-```
+- ユーザーが与えたパスは `Path.resolve()` で正規化し、許可ディレクトリの外を指していないか
+  `is_relative_to` で確認してから使う。
+- ユーザー向けのエラーメッセージに内部パス・スタックトレース・接続文字列を含めない。
+  詳細はログ側に残す ([logging.md](logging.md))。
+- ログに機密情報 (key, token, 個人情報) を出力しない。
 
-## 入力検証
+## 危険な関数を例外的に使う場合
 
-### ファイルパス
-- `Path.resolve()`で正規化してpath traversalを防止
-- ユーザー入力のパスは必ず検証
-
-```python
-from pathlib import Path
-
-def safe_path(user_input: str, base_dir: Path) -> Path:
-    resolved = (base_dir / user_input).resolve()
-    if not resolved.is_relative_to(base_dir):
-        raise ValueError("Invalid path: outside allowed directory")
-    return resolved
-```
-
-### ユーザー入力
-- すべてのユーザー入力はバリデーション必須
-- 型変換前にnullチェック
-- 予期しない値は早期にエラー
-
-## SQLセキュリティ
-
-### ORM / パラメータ化クエリを使用
-- 生のSQL文字列連結は禁止
-- パラメータ化クエリを使用
-
-```python
-# 正しい: ORM 経由
-session.query(Item).filter(Item.id == item_id).first()
-
-# 禁止: 文字列連結
-session.execute(f"SELECT * FROM items WHERE id = {item_id}")
-```
-
-## 危険な関数の使用禁止
-
-以下の関数は原則使用禁止:
-- `eval()` / `exec()` - コードインジェクションリスク
-- `pickle.load()` - 任意コード実行リスク
-- `os.system()` - コマンドインジェクションリスク
-- `subprocess` with `shell=True` - コマンドインジェクションリスク
-- `yaml.load()` without `Loader=SafeLoader`
-
-### 例外が必要な場合
-- コードレビューで明示的な承認を得る
-- 入力が完全に信頼できることを文書化
-- コメントで理由を説明
-
-## 例外処理と情報漏洩
-
-### 禁止事項
-- ユーザー向けエラーメッセージに内部パス/スタック情報を含めない
-- ログに機密情報を出力しない
-
-```python
-# 正しい
-except FileNotFoundError:
-    raise ValueError("File not found")
-
-# 禁止
-except FileNotFoundError as e:
-    raise ValueError(f"File not found: {e}")  # 内部パス露出
-```
+lint の `S` 指摘を抑制してまで使うのは、入力が完全に信頼できる (自プロジェクトが生成したファイル、
+定数のみ 等) と文書化できる場合に限る。抑制コメントに理由を書き、コードレビューで明示的に承認を得る。
 
 ## セキュリティ問題発見時
 
-重大なセキュリティ脆弱性を発見した場合:
-1. 即座に作業を中断
-2. 該当コードを修正
-3. コードレビューで確認
-4. 必要に応じてセキュリティ監査を実施
+重大な脆弱性を見つけたら、進行中の作業より優先して修正し、レビューで確認する。
 
-> **プロジェクト固有:** 使用する静的解析ツール (Bandit, Semgrep 等) や脆弱性スキャンの実行コマンドは導入先で追記する。
+> **プロジェクト固有:** Ruff `S` 以外に使う静的解析 (Semgrep 等) や脆弱性スキャンの実行コマンドは
+> 導入先で追記する。

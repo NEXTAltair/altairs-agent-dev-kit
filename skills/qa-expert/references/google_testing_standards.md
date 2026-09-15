@@ -80,7 +80,7 @@ Examples:
 - Test individual functions/methods
 - No external dependencies
 - Fast execution (<100ms)
-- Coverage: ≥80% statements, 75% branches
+- Coverage: ≥75% statements
 
 **Integration Tests**:
 - Test component interactions
@@ -105,10 +105,10 @@ Examples:
 ## Coverage Thresholds
 
 ### Code Coverage Targets
-- ✅ **Statements**: ≥80%
-- ✅ **Branches**: ≥75%
-- ✅ **Functions**: ≥85%
-- ✅ **Lines**: ≥80%
+- ✅ **Statements**: ≥75%
+- ✅ **Branches**: ≥70%
+- ✅ **Functions**: ≥75%
+- ✅ **Lines**: ≥75%
 
 ### Test Distribution (Recommended)
 - Unit Tests: 70%
@@ -223,7 +223,7 @@ function processSkillName(input: string): void {
 | Pass Rate | ≥80% | Yes |
 | P0 Bugs | 0 | Yes |
 | P1 Bugs | ≤5 | Yes |
-| Code Coverage | ≥80% | Yes |
+| Code Coverage | ≥75% | Yes |
 | Security | 90% OWASP | Yes |
 
 ### Daily Checkpoints

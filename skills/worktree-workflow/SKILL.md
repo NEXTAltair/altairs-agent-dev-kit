@@ -3,7 +3,6 @@ name: worktree-workflow
 description: "Operate Git worktrees under .agents/worktree/ for implementation work: one-time setup (.gitignore, VS Code detection settings), start a worktree with a branch, work inside it with the shared venv, recover when the pre-edit hook blocks a shared-checkout edit, assign worktrees to parallel workers, hand off to PR, and clean up after merge. Use when starting implementation on an Issue/feature, when a hook message says to start from a worktree, or when asked to 「worktree 切って」「ワークツリー作って」「worktree 掃除」「ワークツリー削除」. Do NOT use for: PR polling/repair/merge (pr-maintainer, pr-autoloop) or deciding whether worktree is required (that policy lives in rules/git-workflow.md)."
 metadata:
   short-description: ".agents/worktree/ 配下の worktree の初期設定・作成・作業・hook ブロックからの復帰・並列割当・PR 引き継ぎ・掃除の手順。"
-  dependencies: "github-ops"
 ---
 
 # Worktree Workflow

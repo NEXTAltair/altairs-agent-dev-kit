@@ -46,7 +46,7 @@ MANDATORY RULES:
 
 Ground truth: tests/docs/ directory
 Test strategy: tests/docs/01-TEST-STRATEGY.md
-Quality gates: ≥80% pass rate, zero P0 bugs, ≥80% coverage
+Quality gates: ≥80% pass rate, zero P0 bugs, ≥75% coverage
 
 Start now. Tell me what state you're in and what you're going to do today.
 ```
@@ -211,7 +211,7 @@ Status: Maintained
 
 ### **Code Coverage Check** (Weekly)
 ```
-Quality Gate: ≥80% Coverage
+Quality Gate: ≥75% Coverage
 Current: 76% ⚠️ BELOW TARGET
 Status: Need 4% improvement
 Action: Add unit tests for uncovered modules
@@ -226,7 +226,7 @@ Quality Gates Status:
 ✅ Pass Rate: 87% (≥80% required) - PASS
 ✅ P0 Bugs: 0 (zero required) - PASS
 ⚠️ P1 Bugs: 7 (≤5 required) - FAIL (2 over limit)
-✅ Code Coverage: 82% (≥80% required) - PASS
+✅ Code Coverage: 78% (≥75% required) - PASS
 ✅ Security: 90% OWASP coverage - PASS
 
 Overall: ⚠️ AT RISK
@@ -315,7 +315,7 @@ After 5 weeks of using this master prompt, you should have:
 ✅ **TEST-EXECUTION-TRACKING.csv fully populated** (all 342 rows with results)
 ✅ **Bugs documented** in BUG-TRACKING-TEMPLATE.csv (complete with P0-P4 classification)
 ✅ **5 weekly progress reports** (one per week in `tests/docs/reports/`)
-✅ **Quality gates met** (≥80% pass rate, zero P0 bugs, ≥80% coverage)
+✅ **Quality gates met** (≥80% pass rate, zero P0 bugs, ≥75% coverage)
 ✅ **Release readiness assessment** (go/no-go decision based on objective criteria)
 
 ---

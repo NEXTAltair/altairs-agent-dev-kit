@@ -3,7 +3,6 @@ name: pr-maintainer
 description: "Maintain an agent-created pull request after creation or after draft-to-ready transition: mark reviewable draft PRs ready, poll CI and review comments with gh, repair failures in the same worktree/session, reply in Japanese, escalate design loops, and squash merge when safe. This skill defines the maintenance POLICY (what to repair, when to merge/escalate); the autonomous re-polling LOOP that reschedules itself without human restarts lives in pr-autoloop. Use after creating PRs or when asked to continue PR maintenance automation."
 metadata:
   short-description: "PR作成後のCI/レビュー監視、修正、返信、設計エスカレーション、squash mergeを共通運用する。"
-  dependencies: "github-ops"
 ---
 
 # PR Maintainer
@@ -93,8 +92,8 @@ Review completion gate:
 - Continue polling until the expected Codex/Bot review signal appears as a PR review, review comment,
   issue comment, issue reaction, or other repository-standard bot review artifact.
 - Codex review state is signaled by reactions from `chatgpt-codex-connector[bot]` on the PR issue:
-  - `eyes` reaction: review is in progress — keep polling, do not merge yet.
-  - `+1` reaction: clean review completed — treat as a completed clean bot review when there are no
+  - `eyes` reaction: review is in progress - keep polling, do not merge yet.
+  - `+1` reaction: clean review completed - treat as a completed clean bot review when there are no
     blocking review comments.
 - **Codex findings are posted as inline pull request review comments, not issue-level comments.**
   `gh pr view --comments` does not return inline review comments. Always fetch them separately

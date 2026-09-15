@@ -1,6 +1,6 @@
 # altairs-agent-dev-kit
 
-AI エージェント (Claude Code / Codex) 向けの開発標準一式 — skills / rules / hooks / agents / Codex 設定 —
+AI エージェント (Claude Code / Codex) 向けの開発標準一式 - skills / rules / hooks / agents / Codex 設定 -
 を、プロジェクト固有の値を含まない汎用コアとして切り出し、任意のリポジトリへ導入・追従できる形で配布する kit。
 
 **対象は Python/uv プロジェクト** (共有 venv 運用・`uv run` 前提の hook / rules を含む)。
@@ -17,10 +17,10 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 
 | 種別 | 数 | 場所 |
 |---|---|---|
-| skills | 15 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
+| skills | 14 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
 | rules | 11 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守・問題解決の姿勢等) |
 | hooks | 5 本 + 共通基盤 | `hooks/scripts/*.py` (+ `hook_common.py`)、設定は `hooks/rules/*.default.json` |
-| agents | 10 本 | `agents/*.md` (Claude Code サブエージェント定義) |
+| agents | 8 本 | `agents/*.md` (Claude Code サブエージェント定義) |
 | Codex 設定 | 一式 | `codex/config.toml.template`, `codex/agents/*.toml` |
 | 設定整合 lint | 1本 | `scripts/check_config_consistency.py` |
 | skill lint | 1本 | `scripts/lint_skills.py` |
@@ -103,7 +103,7 @@ kit 同梱の hook デフォルトはほとんどのゲートが無効 (空リ�
 ```json
 {
   "ng_words": [
-    {"keyword": "だろう", "message": "推測は禁止。確認した？テストした？"}
+    {"keyword": "重要なのは", "message": "予告・総括の定型。中身を直接書け"}
   ]
 }
 ```
@@ -124,8 +124,8 @@ NG ワード例、rules の追記ポイント、`check_config_consistency.py` �
 
 ## ドキュメント
 
-- [docs/adoption.md](docs/adoption.md) — 導入手順の詳細とプロジェクト層 override の書き方
-- [docs/skill-install-runbook.md](docs/skill-install-runbook.md) — skill 導入/更新の runbook (canonical レイアウト・sourceType・github@ref bump・footgun 対策)
-- [docs/third-party-skills.md](docs/third-party-skills.md) — 同梱しないサードパーティ skill の推奨インストールリスト
-- [docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md](docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — 設計書 (**構築時の歴史記録**。移植元パス等は当時のまま。現行仕様は adoption.md と ADR を参照)
-- [docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md](docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — 実装計画 (**構築時の歴史記録**。完了済み)
+- [docs/adoption.md](docs/adoption.md) - 導入手順の詳細とプロジェクト層 override の書き方
+- [docs/skill-install-runbook.md](docs/skill-install-runbook.md) - skill 導入/更新の runbook (canonical レイアウト・sourceType・github@ref bump・footgun 対策)
+- [docs/third-party-skills.md](docs/third-party-skills.md) - 同梱しないサードパーティ skill の推奨インストールリスト
+- [docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md](docs/superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) - 設計書 (**構築時の歴史記録**。移植元パス等は当時のまま。現行仕様は adoption.md と ADR を参照)
+- [docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md](docs/superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) - 実装計画 (**構築時の歴史記録**。完了済み)

@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.
+description: "Design, create, validate, review, and package a Claude Code skill (SKILL.md plus references/scripts/assets). Use when asked to 「スキル作って」「スキル設計」「SKILL.md 作成」「スキルレビュー」, when a new reusable workflow or domain knowledge should become a skill, when an existing skill's description fails to trigger or its SKILL.md has grown past progressive-disclosure limits, or when a skill needs a sanitization/security review before distribution. Do NOT use for: running or invoking an existing skill, or editing CLAUDE.md / rules (those are not skills)."
 license: Complete terms in LICENSE.txt
 ---
 
@@ -12,7 +12,7 @@ This skill provides guidance for creating effective skills.
 
 Skills are modular, self-contained packages that extend Claude's capabilities by providing
 specialized knowledge, workflows, and tools. Think of them as "onboarding guides" for specific
-domains or tasks—they transform Claude from a general-purpose agent into a specialized agent
+domains or tasks-they transform Claude from a general-purpose agent into a specialized agent
 equipped with procedural knowledge that no model can fully possess.
 
 ### What Skills Provide
@@ -63,7 +63,7 @@ Documentation and reference material intended to be loaded as needed into contex
 - **Use cases**: Database schemas, API documentation, domain knowledge, company policies, detailed workflow guides
 - **Benefits**: Keeps SKILL.md lean, loaded only when Claude determines it's needed
 - **Best practice**: If files are large (>10k words), include grep search patterns in SKILL.md
-- **Avoid duplication**: Information should live in either SKILL.md or references files, not both. Prefer references files for detailed information unless it's truly core to the skill—this keeps SKILL.md lean while making information discoverable without hogging the context window. Keep only essential procedural instructions and workflow guidance in SKILL.md; move detailed reference material, schemas, and examples to references files.
+- **Avoid duplication**: Information should live in either SKILL.md or references files, not both. Prefer references files for detailed information unless it's truly core to the skill-this keeps SKILL.md lean while making information discoverable without hogging the context window. Keep only essential procedural instructions and workflow guidance in SKILL.md; move detailed reference material, schemas, and examples to references files.
 
 ##### Assets (`assets/`)
 
@@ -112,7 +112,7 @@ Anthropic has wrote skill authoring best practices, you SHOULD retrieve it befor
 
 ## ⚠️ CRITICAL: Edit Skills at Source Location
 
-**NEVER edit skills in `~/.claude/plugins/cache/`** — that's a read-only cache directory. All changes there are:
+**NEVER edit skills in `~/.claude/plugins/cache/`** - that's a read-only cache directory. All changes there are:
 - Lost when cache refreshes
 - Not synced to source control
 - Wasted effort requiring manual re-merge

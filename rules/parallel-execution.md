@@ -23,63 +23,19 @@ UV_PROJECT_ENVIRONMENT=<project root>/.venv uv run pytest
 
 `--active` が必要な特殊ケースでも、venv を直接 activate 済みなら `.venv/bin/<command>` を直接呼ぶことで hook ブロックを回避できる。
 
-## 4 つのルール
+## 運用ルール
 
-### 1. 並列で実行する場合は worktree 分離
+核心ルールの具体形は次の 3 つ。1 と 2 は hook (`worktree_uv_guard`) で機械的に止められる。
 
-並列タスクごとに独立した worktree を切る (配置先は `.agents/worktree/` 配下、詳細は [git-workflow.md](git-workflow.md) 参照)。ただし通常は worktree ごとの venv を作らず、共有実行環境を明示する。
-
-```bash
-# 正しい: 並列ジョブごとに worktree
-git worktree add .agents/worktree/job-a -b feat/job-a
-git worktree add .agents/worktree/job-b -b feat/job-b
-# それぞれの worktree 内で共有 venv を明示して実行
-UV_PROJECT_ENVIRONMENT=<project root>/.venv uv run pytest
-
-# 禁止: 同一 venv を並列で叩く
-uv run pytest tests/unit/ &
-uv run pytest tests/integration/ &
-wait
-```
-
-### 2. `--active` 相当のフラグは原則使わない
-
-`--active` は現在 activate 中の venv を尊重するが、マニフェストの制約と不一致な場合に **venv 再作成のトリガー** になり得る。前述の hook で自動ブロックできる。
-
-```bash
-# 禁止
-uv run --active pytest
-
-# 正しい: パッケージマネージャが管理する venv (自動同期、並列セーフ)
-uv run pytest
-```
-
-### 3. 同期系操作 (`sync` / `lock`) は直列実行
-
-`uv sync` / `uv lock` 相当のコマンドは venv および lockfile を書き換えるため、並列実行で競合する。複数タスクの同時実行でも逐次に並べる。
-
-```bash
-# 禁止
-uv sync &
-uv sync --dev &
-wait
-
-# 正しい
-uv sync && uv sync --dev
-```
-
-### 4. 言語ランタイムのバージョンは固定ファイルで管理
-
-`.python-version` (Python の場合) 等、ランタイムバージョン固定ファイルを使い、手動 activate するシェルでもバージョン一致を確認する。
-
-```bash
-# 確認
-cat .python-version
-python --version
-.venv/bin/python --version
-```
-
-固定バージョンを変更する場合は影響範囲が広いため PR レビュー必須。
+1. **並列タスクは worktree で分離し、共有 venv を明示して使う。** 同一 venv を並列で叩かない
+   (`uv run pytest tests/unit/ & uv run pytest tests/integration/ &` のような並列起動は禁止)。
+2. **`--active` 相当のフラグは使わない。** activate 中の venv とマニフェストの制約が食い違うと
+   venv 再作成のトリガーになる。
+3. **`uv sync` / `uv lock` 相当の書き換え系は直列に並べる。** `uv sync && uv sync --dev` のように
+   逐次実行し、`&` で並列にしない。
+4. **言語ランタイムのバージョンは固定ファイル (`.python-version` 等) で管理する。** 手動 activate する
+   shell でも `python --version` と `.venv/bin/python --version` の一致を確認する。固定バージョンの
+   変更は影響範囲が広いため PR レビュー必須。
 
 ## venv 分離粒度: worktree 間
 
@@ -154,7 +110,7 @@ uv sync --dev
 ```
 
 注意点:
-- 重い依存の再ダウンロードが発生する場合がある (数分〜十数分)
+- 重い依存の再ダウンロードが発生する場合がある (数分~十数分)
 - worktree 内の venv が壊れた場合は当該 worktree 内で同様に実行
 - 復旧中は他のパッケージマネージャコマンドを走らせない
 

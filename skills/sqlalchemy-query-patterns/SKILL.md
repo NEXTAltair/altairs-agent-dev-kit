@@ -1,8 +1,8 @@
 ---
 name: sqlalchemy-query-patterns
-description: SQLAlchemy の効率的なクエリパターン集。N+1回避、サブクエリ、バルク操作、インデックス活用、EXPLAIN解析など、SQLite ベースのプロジェクトに適用できるクエリ最適化ガイド。Use when writing new queries, optimizing slow queries, or reviewing database access patterns.
+description: "SQLAlchemy query patterns for SQLite-backed projects: N+1 avoidance (selectinload/joinedload), EXISTS/COUNT, bulk insert/update/upsert, subqueries and CTEs, dynamic filters, index design, WAL mode, EXPLAIN, keyset pagination, anti-patterns. Use when writing a new query method, when a query is slow or an N+1 is suspected, when implementing bulk operations, when reviewing repository/data-access code, or when asked to 「クエリ最適化」「N+1 直して」「EXPLAIN 見て」「バルク insert」. Do NOT use for: schema design / migrations (db-schema-reviewer agent) or non-SQLAlchemy ORMs."
 metadata:
-  short-description: SQLAlchemy効率クエリ（N+1回避、バルク操作、インデックス、EXPLAIN）。
+  short-description: SQLAlchemy効率クエリ(N+1回避、バルク操作、インデックス、EXPLAIN)。
 allowed-tools:
   - Grep
   - Glob
@@ -29,10 +29,10 @@ Use this skill when:
 
 SQLite + SQLAlchemy ORM + Repository パターンの構成を想定。具体のスキーマ/リポジトリ配置は導入先に従う。
 
-以降のコード例では、EC（受注管理）を題材にした以下のようなモデル構成を例として使う:
+以降のコード例では、EC(受注管理)を題材にした以下のようなモデル構成を例として使う:
 
 ```
-Order ──┬── OrderItem (1:N)  - 注文明細（OrderItem は Product を N:1 参照）
+Order ──┬── OrderItem (1:N)  - 注文明細(OrderItem は Product を N:1 参照)
         └── Payment (1:N)    - 支払い記録
 
 Product ──┬── Review (1:N)   - レビュー
@@ -44,21 +44,21 @@ Product ──┬── Review (1:N)   - レビュー
 ### 問題: N+1 クエリ
 
 ```python
-# ❌ BAD: N+1 クエリ（注文ごとに明細を個別取得）
+# ❌ BAD: N+1 クエリ(注文ごとに明細を個別取得)
 with session_factory() as session:
     orders = session.execute(select(Order)).scalars().all()
     for order in orders:
-        items = order.items  # 注文ごとに追加クエリ発行！
+        items = order.items  # 注文ごとに追加クエリ発行!
 ```
 
-### 解決策 1: selectinload（推奨）
+### 解決策 1: selectinload(推奨)
 
 ```python
 from sqlalchemy.orm import selectinload
 
-# ✅ GOOD: IN句で一括取得（2クエリ）
+# ✅ GOOD: IN句で一括取得(2クエリ)
 def get_orders_with_items(self) -> list[Order]:
-    """注文一覧を明細付きで取得（selectinload）。
+    """注文一覧を明細付きで取得(selectinload)。
 
     Returns:
         明細をeager loadした注文リスト。
@@ -72,12 +72,12 @@ def get_orders_with_items(self) -> list[Order]:
         return list(session.execute(stmt).scalars().all())
 ```
 
-### 解決策 2: joinedload（1対1 / 少数リレーション向け）
+### 解決策 2: joinedload(1対1 / 少数リレーション向け)
 
 ```python
 from sqlalchemy.orm import joinedload
 
-# ✅ GOOD: JOINで1クエリ（子が少ない場合に有効）
+# ✅ GOOD: JOINで1クエリ(子が少ない場合に有効)
 def get_order_with_products(self, order_id: int) -> Order | None:
     """注文と商品情報をJOINで一括取得。
 
@@ -129,19 +129,19 @@ def get_order_full(self, order_id: int) -> Order | None:
 | `selectinload` | 1:N リレーション | `SELECT ... WHERE id IN (...)` | Order→OrderItems, Order→Payments |
 | `joinedload` | 1:1 / N:1 リレーション | `LEFT JOIN` | OrderItem→Product |
 | `subqueryload` | 大量データの1:N | サブクエリ | 大規模バッチ処理 |
-| `raiseload` | アクセス禁止（検出用） | N/A | デバッグ時のN+1検出 |
+| `raiseload` | アクセス禁止(検出用) | N/A | デバッグ時のN+1検出 |
 
 ## 2. 効率的な SELECT パターン
 
 ### 必要なカラムだけ取得
 
 ```python
-# ❌ BAD: 全カラム取得（不要なデータもメモリに載る）
+# ❌ BAD: 全カラム取得(不要なデータもメモリに載る)
 products = session.execute(select(Product)).scalars().all()
 
 # ✅ GOOD: 必要なカラムだけ取得
 stmt = select(Product.id, Product.sku, Product.name).where(Product.is_active == True)
-rows = session.execute(stmt).all()  # Row オブジェクト（軽量）
+rows = session.execute(stmt).all()  # Row オブジェクト(軽量)
 ```
 
 ### EXISTS で存在チェック
@@ -153,7 +153,7 @@ from sqlalchemy import exists
 orders = session.execute(select(Order).where(...)).scalars().all()
 has_orders = len(orders) > 0
 
-# ✅ GOOD: EXISTS サブクエリ（即座にbool返却）
+# ✅ GOOD: EXISTS サブクエリ(即座にbool返却)
 def has_unpaid_orders(self) -> bool:
     """未払い注文の存在を高速チェック。
 
@@ -201,12 +201,12 @@ def count_orders_by_product(self, product_id: int) -> int:
 ### バルク INSERT
 
 ```python
-# ❌ BAD: 1件ずつ追加（N回のINSERT）
+# ❌ BAD: 1件ずつ追加(N回のINSERT)
 for item_data in item_list:
     session.add(OrderItem(**item_data))
     session.commit()
 
-# ✅ GOOD: バルクINSERT（1回のINSERT）
+# ✅ GOOD: バルクINSERT(1回のINSERT)
 def bulk_add_order_items(self, items: list[dict[str, Any]]) -> int:
     """注文明細を一括挿入。
 
@@ -231,7 +231,7 @@ for product_id, avg in updates.items():
     product.rating_avg = avg
     session.commit()
 
-# ✅ GOOD: バルクUPDATE（WHERE IN句）
+# ✅ GOOD: バルクUPDATE(WHERE IN句)
 def bulk_update_ratings(
     self,
     rating_updates: list[dict[str, Any]],
@@ -250,13 +250,13 @@ def bulk_update_ratings(
         return len(rating_updates)
 ```
 
-### バルク UPSERT（INSERT OR REPLACE）
+### バルク UPSERT(INSERT OR REPLACE)
 
 ```python
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 def upsert_order_items(self, items: list[dict[str, Any]]) -> int:
-    """注文明細のUPSERT（存在すれば更新、なければ挿入）。
+    """注文明細のUPSERT(存在すれば更新、なければ挿入)。
 
     SQLite の ON CONFLICT を使用。
 
@@ -285,7 +285,7 @@ def upsert_order_items(self, items: list[dict[str, Any]]) -> int:
 ### 相関サブクエリ
 
 ```python
-# 最新レビューのみ取得（商品ごとに最新の1件）
+# 最新レビューのみ取得(商品ごとに最新の1件)
 def get_latest_reviews(self) -> list[Row]:
     """各商品の最新レビューを取得。
 
@@ -307,7 +307,7 @@ def get_latest_reviews(self) -> list[Row]:
         return list(session.execute(stmt).all())
 ```
 
-### CTE（Common Table Expression）
+### CTE(Common Table Expression)
 
 ```python
 from sqlalchemy import cte
@@ -350,7 +350,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class OrderSearchCriteria:
-    """注文検索条件（型安全）。"""
+    """注文検索条件(型安全)。"""
 
     skus: list[str] = field(default_factory=list)
     min_amount: float | None = None
@@ -360,7 +360,7 @@ class OrderSearchCriteria:
     offset: int = 0
 
 def search_orders(self, criteria: OrderSearchCriteria) -> list[Order]:
-    """条件に基づく注文検索（動的フィルタ）。
+    """条件に基づく注文検索(動的フィルタ)。
 
     Args:
         criteria: 検索条件。
@@ -440,7 +440,7 @@ class OrderItem(Base):
 ```python
 from sqlalchemy import event
 
-# エンジン初期化モジュールで設定（読み取り並行性向上）
+# エンジン初期化モジュールで設定(読み取り並行性向上)
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_conn, connection_record):
     cursor = dbapi_conn.cursor()
@@ -455,7 +455,7 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
 ```python
 # デバッグ用: クエリの実行計画を表示
 def explain_query(self, stmt: Select) -> list[str]:
-    """クエリの実行計画を取得（デバッグ用）。
+    """クエリの実行計画を取得(デバッグ用)。
 
     Args:
         stmt: 解析対象のSELECT文。
@@ -477,13 +477,13 @@ def explain_query(self, stmt: Select) -> list[str]:
 
 ## 7. ページネーション
 
-### Keyset ページネーション（推奨）
+### Keyset ページネーション(推奨)
 
 ```python
-# ❌ BAD: OFFSET ページネーション（大量データで遅い）
+# ❌ BAD: OFFSET ページネーション(大量データで遅い)
 stmt = select(Order).offset(10000).limit(100)
 
-# ✅ GOOD: Keyset ページネーション（一定速度）
+# ✅ GOOD: Keyset ページネーション(一定速度)
 def get_orders_page(
     self,
     last_id: int | None = None,
@@ -496,7 +496,7 @@ def get_orders_page(
         page_size: 1ページの件数。
 
     Returns:
-        注文リスト（page_size件）。
+        注文リスト(page_size件)。
     """
     with self.session_factory() as session:
         stmt = select(Order).order_by(Order.id)
@@ -522,7 +522,7 @@ def get_orders_page(
 
 **Eager Loading:**
 ```python
-selectinload(Order.items)      # 1:N → IN句（推奨）
+selectinload(Order.items)      # 1:N → IN句(推奨)
 joinedload(OrderItem.product)  # N:1 → JOIN
 subqueryload(Order.items)      # 1:N → サブクエリ
 ```

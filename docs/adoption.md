@@ -48,7 +48,7 @@ Python executable の絶対パスを設定する。hook は作業中 Git checkou
 plugin 更新でソースが変わっても branch pin は維持される。版更新・復元手順は
 [runtime 契約](hook-runtime.md) を参照。plugin とプロジェクト設定で同じ hook を二重登録しない。
 
-### 経路B: skills.sh (`npx skills add`) — skill 単体導入
+### 経路B: skills.sh (`npx skills add`) - skill 単体導入
 
 skill を 1 本ずつ選んで導入したい場合:
 
@@ -61,7 +61,7 @@ npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.4.0" --skill okf-bund
 `skills/<name>/SKILL.md` が skills.sh の標準配置と一致しているため、任意の skill 名を
 `--skill` に指定できる。同梱 skill 一覧は `skills/` 配下のディレクトリ名を参照。
 
-### 経路C: install.sh — kit 全体を repo に導入する推奨経路
+### 経路C: install.sh - kit 全体を repo に導入する推奨経路
 
 Claude Code プラグイン機構を使わない環境、または Codex 環境向け。`--all` を指定すれば
 skills / rules / agents / hooks / Codex 設定をこれ 1 本で導入できる。
@@ -121,7 +121,7 @@ override の list は default の list に **連結** される (置換ではな
 個別エントリを無効化したい場合は override だけでは実現できず、kit の default JSON 自体を
 編集した fork を使う必要がある。
 
-### `.claude/hooks/rules/pre_commands.json` — uv ガード等の有効化例
+### `.claude/hooks/rules/pre_commands.json` - uv ガード等の有効化例
 
 `uv sync`/`uv run --active` の並列実行事故のような、言語依存のガードを有効化したい場合の例:
 
@@ -138,7 +138,7 @@ override の list は default の list に **連結** される (置換ではな
 - `blocked_commands` は kit デフォルトの配列に **連結** される (git 破壊系コマンドのブロックはそのまま有効)
 - `worktree_uv_guard: true` で「worktree 内の `uv` 実行は共有 venv (`UV_PROJECT_ENVIRONMENT=...`) を明示しないとブロック」が有効化される
 
-### `.claude/hooks/rules/pre_edit_worktree.json` — 保護ディレクトリの上書き
+### `.claude/hooks/rules/pre_edit_worktree.json` - 保護ディレクトリの上書き
 
 編集ゲート (`hook_pre_edit_worktree.py`) は共有 checkout 直下の保護ディレクトリ
 (デフォルト: `src`, `tests`) への編集をブロックし、`.agents/worktree/` 配下での編集のみ
@@ -155,23 +155,21 @@ override の list は default の list に **連結** される (置換ではな
 なお worktree の配置先 `.agents/worktree/` は kit の規約として固定
 (git-workflow ルール・worktree provider・編集ゲートが同じパスを前提に連携する)。
 
-### `.claude/hooks/rules/response_monitor.json` — NG ワード例
+### `.claude/hooks/rules/response_monitor.json` - NG ワード例
 
 kit デフォルトは `ng_words: []` (無効)。NG ワードはプロジェクト文化依存のため、
 自分のプロジェクトで実際に運用している応答品質ルールを override に書く。
+「確認した?テストした?」のような検証を促す小言は現行モデルには不要 (自発的に検証する) なので、
+文体・スコープ規律のように lint でもモデル既定でも決まらないものに絞る。
 以下は実例 (`keyword` / `keywords`+`threshold` の両形式):
 
 ```json
 {
   "ng_words": [
-    {"keyword": "だろう", "message": "推測は禁止。確認した？テストした？"},
-    {"keyword": "おそらく", "message": "推測は禁止。確認した？テストした？"},
     {"keyword": "ついでに", "message": "指示外の追加作業は禁止"},
     {"keyword": "重要なのは", "message": "予告・総括の定型。中身を直接書け"},
     {"keyword": "不可欠", "message": "空虚な形容。強調ではなく主張の中身を説明しろ"},
-    {"keywords": ["さらに", "また", "加えて"], "threshold": 3, "message": "接続詞の連打。情報を足さずに繋ぐな"},
-    {"keywords": ["かもしれ"], "message": "推測は禁止",
-     "exclude_patterns": ["かもしれない(が|けど)", "かもしれません(が|けど)"]}
+    {"keywords": ["さらに", "また", "加えて"], "threshold": 3, "message": "接続詞の連打。情報を足さずに繋ぐな"}
   ]
 }
 ```
@@ -179,10 +177,10 @@ kit デフォルトは `ng_words: []` (無効)。NG ワードはプロジェク�
 `keyword` (単数) と `keywords` (複数、`threshold` と組み合わせて出現回数の合計で判定) の
 どちらも使える。引用符 (`「」` / `""` / `` ` ` ``) 内の文字列はキーワード判定から除外される
 (引用・言及・例示を誤検知しない)。`exclude_patterns` (正規表現リスト) に一致する部分は
-**そのルールの判定対象からのみ**除去される — 譲歩構文やルール名の自己言及を許容しつつ
+**そのルールの判定対象からのみ**除去される - 譲歩構文やルール名の自己言及を許容しつつ
 素の出現だけを検出したい場合に使う (不正な正規表現は無視される)。
 
-### `.claude/hooks/rules/consistency.json` — required_env 宣言
+### `.claude/hooks/rules/consistency.json` - required_env 宣言
 
 `scripts/check_config_consistency.py` が読む設定。rules が前提とする環境変数を宣言し、
 `.claude/settings.json` の `env` に実在するかを検査する:
@@ -205,11 +203,11 @@ kit デフォルトは `ng_words: []` (無効)。NG ワードはプロジェク�
 汎用化できないドメイン固有 skill は kit に同梱せず、各プロジェクトの `.agents/skills/` /
 `.claude/skills/` に個別に置く。実例として `NEXTAltair/LoRAIro` の以下の skill を参照:
 
-- [lorairo-qt-widget](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-qt-widget) — PySide6 ウィジェット実装パターン
-- [lorairo-repository-pattern](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-repository-pattern) — SQLAlchemy repository パターン
-- [lorairo-test-generator](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-test-generator) — pytest/pytest-qt テスト生成
-- [lorairo-mem](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-mem) — 長期記憶 (OpenClaw LTM) 連携
-- [lorairo-design-capture](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-design-capture) — デザインプロトタイプのキャプチャ手順
+- [lorairo-qt-widget](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-qt-widget) - PySide6 ウィジェット実装パターン
+- [lorairo-repository-pattern](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-repository-pattern) - SQLAlchemy repository パターン
+- [lorairo-test-generator](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-test-generator) - pytest/pytest-qt テスト生成
+- [lorairo-mem](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-mem) - 長期記憶 (OpenClaw LTM) 連携
+- [lorairo-design-capture](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-design-capture) - デザインプロトタイプのキャプチャ手順
 
 自分のプロジェクトでも、ドメイン固有の知識・ワークフローは同様に `<project>-<domain>` 形式の
 skill として個別に育てるとよい。
@@ -240,7 +238,7 @@ CI に組み込む場合の例 (GitHub Actions):
 ```
 
 pre-commit 相当で使う場合は PreToolUse hook から呼び出してもよい (kit 自体はこの lint を
-hook として配線していない — CI かローカルの明示実行を想定した独立 CLI)。
+hook として配線していない - CI かローカルの明示実行を想定した独立 CLI)。
 
 ## OKF バンドル運用について
 

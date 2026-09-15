@@ -1,8 +1,8 @@
 ---
 name: interface-design
-description: Interface design skill for dashboards, admin panels, apps, and tools. NOT for marketing design. Provides design intent, domain exploration, craft principles, and component-driven design-tool↔code sync. For PySide6/Qt technical implementation, use a project-specific GUI implementation skill (if available).
+description: "Design UI for dashboards, admin panels, internal tools, and desktop/GUI apps: state design intent, explore the domain, apply craft principles (layering, spacing, depth, typography, color, states), and keep design tool and code in sync. Use when asked to 「UI デザイン」「画面設計」「ダッシュボードの見た目」「ウィジェットのデザイン」, when a new screen or widget needs a visual/interaction design before implementation, or when reviewing whether a UI reads as a deliberate design rather than default widgets. Do NOT use for: marketing/landing-page design, or PySide6/Qt implementation details (use the project's GUI implementation skill if one exists)."
 metadata:
-  short-description: UIデザイン原則（意図、ドメイン探索、クラフト）。技術実装はプロジェクト固有のGUI実装スキル（あれば）を参照。
+  short-description: UIデザイン原則(意図、ドメイン探索、クラフト)。技術実装はプロジェクト固有のGUI実装スキル(あれば)を参照。
   origin: https://github.com/Dammyjay93/interface-design
 allowed-tools:
   - Grep
@@ -113,7 +113,7 @@ Crafted output: Task type -> Product domain -> Signature -> Structure + Expressi
 
 ## Domain Example: インシデント管理ダッシュボード
 
-For an incident management dashboard (a representative "tools" domain — apply the same questions to your own product):
+For an incident management dashboard (a representative "tools" domain - apply the same questions to your own product):
 
 **Domain:** Air-traffic control tower, hospital triage board, fire station status wall, ship's bridge, mission control console
 
@@ -270,7 +270,7 @@ QWidget {
 # Design Tool ↔ Implementation Sync (component-driven)
 
 When a design tool holds the design system (e.g. a hosted design app the team syncs to),
-know what is and is not synced — this is platform-neutral; it applies whatever agent or
+know what is and is not synced - this is platform-neutral; it applies whatever agent or
 editor you run in.
 
 - The connector syncs the **component catalog** (tokens + reusable components), one-way:
@@ -283,14 +283,14 @@ editor you run in.
 
 To prevent drift, work **component-driven**, not screen-by-screen:
 
-1. **Per component** — the design tool already defines each reusable widget (the catalog).
+1. **Per component** - the design tool already defines each reusable widget (the catalog).
    Treat each as the spec (its component source + usage notes).
-2. **Judge commonization** — decide: extract a reusable widget in code, or inline it.
+2. **Judge commonization** - decide: extract a reusable widget in code, or inline it.
    Extract widgets used in **2+ screens**; inline true one-offs. Widget extraction is cheap
    composition, not a big refactor.
-3. **Mirror in code** — build a reusable widget that mirrors the design component, driven by
+3. **Mirror in code** - build a reusable widget that mirrors the design component, driven by
    the shared **design tokens** (one token source of truth). Keep mirrors in a dedicated module.
-4. **Compose** — build each screen from the mirrored widgets, so the app and the design's
+4. **Compose** - build each screen from the mirrored widgets, so the app and the design's
    screens share the same component vocabulary. Both sides now reuse the same parts and stay
    aligned.
 
@@ -299,11 +299,11 @@ Anti-patterns:
 - Hand-porting each screen from scratch → repeats the drift.
 - Building the whole mirror library speculatively before any screen uses it (YAGNI). Build the
   components a screen actually needs, prove them by composing that screen, reuse on the next.
-- Placing correct components inside the old layout and calling the screen done — components
+- Placing correct components inside the old layout and calling the screen done - components
   right, structure wrong = visual divergence.
 
 Tokens are the **only** thing the two implementations share. Keep their values in sync between
-the design tool's stylesheet and the app's token module — this is **not automatic**; verify it.
+the design tool's stylesheet and the app's token module - this is **not automatic**; verify it.
 For the extraction/Qt mechanics of the mirror widgets, use a project-specific GUI implementation skill (if available).
 
 ---

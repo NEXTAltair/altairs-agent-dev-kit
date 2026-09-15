@@ -217,7 +217,7 @@ def create_weekly_report_template(base_path):
 | Pass Rate | ≥80% | [%]% | ✅/⚠️/❌ |
 | P0 Bugs | 0 | [N] | ✅/⚠️/❌ |
 | P1 Bugs | ≤5 | [N] | ✅/⚠️/❌ |
-| Code Coverage | ≥80% | [%]% | ✅/⚠️/❌ |
+| Code Coverage | ≥75% | [%]% | ✅/⚠️/❌ |
 | Security Coverage | 90% | [%]% | ✅/⚠️/❌ |
 
 ---
@@ -412,7 +412,7 @@ def create_readme(base_path, project_name):
 | Test Execution | 100% | ⏳ Not Started |
 | Pass Rate | ≥80% | ⏳ Not Started |
 | P0 Bugs | 0 | ✅ No blockers |
-| Code Coverage | ≥80% | ⏳ Baseline TBD |
+| Code Coverage | ≥75% | ⏳ Baseline TBD |
 | Security | 90% | ⏳ Week 4 |
 
 ---

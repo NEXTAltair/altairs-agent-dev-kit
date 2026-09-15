@@ -1,6 +1,6 @@
 ---
 name: qa-expert
-description: "Establish QA testing processes: test strategies, Google Testing Standards, P0-P4 bug tracking, OWASP security, quality metrics, 90% coverage targets. Includes master prompts for autonomous execution and third-party QA team handoff documentation."
+description: "Set up and run a documented QA process for a project: initialize tests/docs/ with test-case documents, execution-tracking and bug-tracking CSVs, baseline/weekly metrics templates, P0-P4 bug severity, OWASP Top 10 security test coverage, and a master prompt for autonomous LLM-driven test execution or third-party QA handoff. Use when asked to 「QA プロセス立ち上げ」「テストケース文書化」「QA 引き継ぎ資料」「バグ管理表」, when starting structured QA from scratch, or when a QA team needs handoff documentation. Do NOT use for: writing ordinary pytest unit tests or deciding coverage policy (that lives in rules/testing.md, 75% target)."
 ---
 
 # QA Expert
@@ -123,7 +123,7 @@ python scripts/calculate_metrics.py <path/to/TEST-EXECUTION-TRACKING.csv>
 | Pass Rate | ≥80% | Yes |
 | P0 Bugs | 0 | Yes |
 | P1 Bugs | ≤5 | Yes |
-| Code Coverage | ≥80% | Yes |
+| Code Coverage | ≥75% | Yes |
 | Security | 90% OWASP | Yes |
 
 ### 6. Progress Reporting

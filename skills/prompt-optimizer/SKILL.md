@@ -1,6 +1,6 @@
 ---
 name: prompt-optimizer
-description: Transform vague prompts into precise specifications using EARS (Easy Approach to Requirements Syntax) methodology. Use when requirements are loose, ambiguous, or need enhancement for AI-generated code, products, or documents.
+description: "Rewrite a vague request into a precise EARS-format specification (event/state/optional/unwanted-behavior clauses, domain theories, concrete examples, enhanced prompt). Use when a feature request has no measurable outcome or trigger conditions (「ダッシュボード作って」「リマインダーアプリ」), when a prompt for AI-generated code/docs needs tightening before implementation, or when asked to 「プロンプト最適化」「要件を精緻化」「仕様に落として」. Do NOT use for: defining done-criteria / stop conditions for an autonomous run (goal-prompt-crafter), or tasks whose scope is already one clear sentence."
 metadata:
   origin: https://mp.weixin.qq.com/s/yUVX-9FovSq7ZGChkHpuXQ
 ---
