@@ -91,7 +91,8 @@ installer が動いていないことを確認して空のディレクトリを�
 
 ## 失敗の契約
 
-runtime 欠損・版不一致・不正 lock・Git root 検出失敗は stderr に `agent-kit runtime unavailable`
+runtime 欠損・版不一致・不正 lock・Git root 検出失敗 (起動入口の git 呼び出しが合計 15 秒の
+`STARTUP_BUDGET` を超えた場合を含む) は stderr に `agent-kit runtime unavailable`
 と復元案内を出す。PreToolUse は stdout の `hookSpecificOutput.permissionDecision=deny`、
 Stop は `decision=block` (ともに exit 0 の構造化拒否) を返す。
 Stop の再入 (`stop_hook_active: true`) は stderr に診断を残して exit 0 で終了し、

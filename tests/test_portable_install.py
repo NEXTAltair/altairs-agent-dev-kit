@@ -545,12 +545,36 @@ def test_ownership_chain_is_followed_to_the_outermost_superproject(tmp_path, mon
     (owner / ".agent-kit/hooks.lock.json").write_text("{}", encoding="utf-8")
     chain = [tmp_path / f"level{depth}" for depth in range(40)] + [owner]
     parents = {chain[index]: chain[index + 1] for index in range(len(chain) - 1)}
-    monkeypatch.setattr(bootstrap, "superproject", lambda checkout: parents.get(checkout))
-    monkeypatch.setattr(bootstrap, "git_root", lambda cwd, *args: chain[0] if "--show-toplevel" in args else owner / ".git")
+    monkeypatch.setattr(bootstrap, "superproject", lambda checkout, timeout=None: parents.get(checkout))
+    monkeypatch.setattr(bootstrap, "git_root",
+                        lambda cwd, *args, timeout=None: chain[0] if "--show-toplevel" in args else owner / ".git")
     assert bootstrap.roots() == (owner, owner)
     parents[owner] = chain[3]
     with pytest.raises(ValueError, match="cycle"):
         bootstrap.roots()
+
+
+def test_startup_git_calls_share_one_budget_however_deep_the_nesting(tmp_path, monkeypatch):
+    """Each nesting level adds a Git call; together they must still end before the registered timeout."""
+    import time
+    import bootstrap
+    chain = [tmp_path / f"level{depth}" for depth in range(40)]
+    parents = {chain[index]: chain[index + 1] for index in range(len(chain) - 1)}
+    timeouts = []
+
+    def slow_superproject(checkout, timeout=None):
+        timeouts.append(timeout)
+        time.sleep(0.05)
+        return parents.get(checkout)
+
+    monkeypatch.setattr(bootstrap, "superproject", slow_superproject)
+    monkeypatch.setattr(bootstrap, "git_root", lambda cwd, *args, timeout=None: chain[0])
+    started = time.monotonic()
+    with pytest.raises(ValueError, match="did not locate the checkout"):
+        bootstrap.roots(time.monotonic() + 0.5)
+    assert time.monotonic() - started < 1.5
+    assert all(0 < timeout <= bootstrap.GIT_TIMEOUT for timeout in timeouts)
+    assert min(timeouts) < 0.5
 
 
 def test_submodule_cwd_resolves_owning_checkout(tmp_path):
@@ -682,9 +706,9 @@ def test_registered_timeouts_cover_worst_case_startup():
     """Both clients run the tool when a hook times out; startup must never use up the timeout."""
     import bootstrap
     from install_harness import CODEX_HOOKS
-    # Launcher: --show-toplevel, --show-superproject-working-tree, --git-common-dir.
+    # Launcher: all of its Git calls share STARTUP_BUDGET, however deep the submodule nesting.
     # Hook: hook_common.find_shared_root. Margin: interpreter start, the hook's own decision.
-    startup = 3 * bootstrap.GIT_TIMEOUT + 5
+    startup = bootstrap.STARTUP_BUDGET + 5
     plugin = json.loads((KIT / "hooks/hooks.json").read_text(encoding="utf-8"))
     timeouts = {(event, handler["args"][-2]): handler["timeout"]
                 for event, groups in plugin["hooks"].items() for group in groups for handler in group["hooks"]}

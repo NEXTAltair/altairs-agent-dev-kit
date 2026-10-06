@@ -30,28 +30,38 @@ REQUIRED = {
 OPTIONAL = {
     "hooks/scripts/hook_worktree_remove.py",
 }
-# Startup runs up to three Git calls (more only inside nested submodules), each bounded by this.
-# Clients ignore a hook that exceeds its registered timeout, so registrations must cover them.
+# Clients ignore a hook that exceeds its registered timeout, so startup must end well before it.
+# Each Git call is bounded by GIT_TIMEOUT, and all of startup's calls together by STARTUP_BUDGET,
+# however deep the submodule nesting is; running out is a startup failure (fail closed).
 GIT_TIMEOUT = 5
+STARTUP_BUDGET = 15
 
 
-def git_root(cwd, *args):
+def git_root(cwd, *args, timeout=GIT_TIMEOUT):
     return Path(subprocess.check_output(
         ["git", "-C", str(cwd), "rev-parse", *args],
-        text=True, encoding="utf-8", stderr=subprocess.PIPE, timeout=GIT_TIMEOUT,
+        text=True, encoding="utf-8", stderr=subprocess.PIPE, timeout=timeout,
     ).strip()).resolve()
 
 
-def superproject(checkout):
+def superproject(checkout, timeout=GIT_TIMEOUT):
     output = subprocess.check_output(
         ["git", "-C", str(checkout), "rev-parse", "--show-superproject-working-tree"],
-        text=True, encoding="utf-8", stderr=subprocess.PIPE, timeout=GIT_TIMEOUT,
+        text=True, encoding="utf-8", stderr=subprocess.PIPE, timeout=timeout,
     ).strip()
     return Path(output).resolve() if output else None
 
 
-def roots():
-    active = git_root(Path.cwd(), "--show-toplevel")
+def roots(deadline=None):
+    def timeout():
+        if deadline is None:
+            return GIT_TIMEOUT
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError("Git did not locate the checkout within " + str(STARTUP_BUDGET) + "s")
+        return min(GIT_TIMEOUT, remaining)
+
+    active = git_root(Path.cwd(), "--show-toplevel", timeout=timeout())
     # A submodule is part of the checkout that pins it, so climb to the outermost
     # superproject before looking for the lock: a lock the submodule carries for its own
     # standalone use never outranks the pinning checkout. Only Git-declared ownership is
@@ -59,7 +69,7 @@ def roots():
     # nested in the tree never borrows the policy of the directory above it.
     visited = {active}
     while True:
-        owner = superproject(active)
+        owner = superproject(active, timeout=timeout())
         if owner is None:
             break
         if owner in visited:
@@ -69,7 +79,7 @@ def roots():
     if not (active / LOCK).is_file():
         raise ValueError(LOCK + " not found in active checkout " + str(active)
                          + " (a bare `cd <owning checkout>` is permitted to leave a nested repository)")
-    common = git_root(active, "--path-format=absolute", "--git-common-dir")
+    common = git_root(active, "--path-format=absolute", "--git-common-dir", timeout=timeout())
     if common.name != ".git" or not (common.parent / ".git").is_dir():
         raise ValueError("unsupported Git layout: shared checkout cannot be determined")
     return active, common.parent
@@ -151,9 +161,10 @@ def failure(event, error, provider="claude"):
 def launch(script, provider="claude", event="PreToolUse", consumer=False, plugin=None):
     # Hooks bound their own work by the registered timeout, which counts from process start;
     # the Git calls below already spend part of it. Same process, so monotonic time is comparable.
-    os.environ["AGENT_KIT_STARTED"] = repr(time.monotonic())
+    started = time.monotonic()
+    os.environ["AGENT_KIT_STARTED"] = repr(started)
     try:
-        active, shared = roots()
+        active, shared = roots(started + STARTUP_BUDGET)
         lock = json.loads((active / LOCK).read_text(encoding="utf-8"))
         # Validate even the ID before constructing a path from it.
         if not isinstance(lock, dict) or not re.fullmatch(r"[0-9a-f]{64}", lock.get("runtime", "")):

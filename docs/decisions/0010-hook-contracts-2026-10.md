@@ -59,12 +59,13 @@ plugin の `${CLAUDE_PLUGIN_ROOT}` / `${user_config.*}`、Codex の `commandWind
 5. **整合 lint** は、固定した runtime が `hook_worktree_remove.py` を含む場合だけ `WorktreeRemove` を必須にする。
 6. **timeout による素通りを防ぐ**。hook の timeout・異常終了・不正な JSON は、両クライアントとも tool 呼び出しを止めない
    (fail-open)。
-   - 起動入口は判定の前に git を最大 3 回 (`bootstrap.GIT_TIMEOUT` = 各 5 秒) 呼び、hook は共有 checkout を探すために
-     もう 1 回呼ぶ。最悪 20 秒かかる起動処理が、5 秒の登録 timeout (編集ゲート・Stop) や 15 秒の登録 timeout
+   - 起動入口は判定の前に git を 3 回 (submodule の中では入れ子 1 段ごとにもう 1 回) 呼び、hook は共有 checkout を
+     探すためにもう 1 回呼ぶ。この起動処理が、5 秒の登録 timeout (編集ゲート・Stop) や 15 秒の登録 timeout
      (コマンド制御・submodule 確認) を使い切ると、git が遅いだけで保護が無効になっていた。
-     PreToolUse と Stop の登録 timeout を両クライアントで 30 秒に揃える。
-     「登録 timeout ≥ 起動の最悪時間 + 余裕」はテストで固定する。通常は 0.1 秒ほどで終わるので、待ち時間が延びるのは
-     git が遅いときだけ。
+   - 起動入口の git 呼び出しは、1 回ごとに `bootstrap.GIT_TIMEOUT` (5 秒)、全体で `bootstrap.STARTUP_BUDGET` (15 秒)
+     に収める。入れ子が何段あっても予算を使い切った時点で起動失敗として扱う (PreToolUse は拒否、Stop は差し戻し)。
+     PreToolUse と Stop の登録 timeout は両クライアントで 30 秒に揃え、「登録 timeout ≥ 起動予算 + hook の git 呼び出し
+     + 余裕」をテストで固定する。通常は 0.1 秒ほどで終わるので、待ち時間が延びるのは git が遅いときだけ。
    - `hook_pre_commands.py` の `git branch -D` 判定は git と `gh` (最大 10 秒) も呼ぶ。判定の締め切りを
      「プロセス起動 + 登録 timeout − 余裕 2 秒」にし、締め切りまでに統合済みと確認できなければ未統合として拒否する。
      起動時刻は起動入口 (`bootstrap.launch`) が `AGENT_KIT_STARTED` に記録する。締め切りの計算は
