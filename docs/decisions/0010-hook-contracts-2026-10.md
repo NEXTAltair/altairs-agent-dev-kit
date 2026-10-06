@@ -53,9 +53,11 @@ plugin の `${CLAUDE_PLUGIN_ROOT}` / `${user_config.*}`、Codex の `commandWind
 5. **整合 lint** は、固定した runtime が `hook_worktree_remove.py` を含む場合だけ `WorktreeRemove` を必須にする。
 6. **timeout による素通りを防ぐ**。hook の timeout・異常終了・不正な JSON は、両クライアントとも tool 呼び出しを止めない
    (fail-open)。`hook_pre_commands.py` の `git branch -D` 判定は git と `gh` (最大 10 秒) を呼ぶため、登録 timeout (5 秒) で
-   打ち切られると未統合ブランチの削除がそのまま通っていた。判定全体に 10 秒の予算を設け、時間内に統合済みと
-   確認できなければ未統合として拒否する。あわせて `hook_pre_commands.py` の登録 timeout を両クライアントで 15 秒にする。
-   予算が登録 timeout に収まることはテストで固定する。
+   打ち切られると未統合ブランチの削除がそのまま通っていた。`hook_pre_commands.py` の登録 timeout を両クライアントで
+   15 秒にし、判定の締め切りを「プロセス起動 + 15 秒 − 余裕 2 秒」にする。起動時刻は起動入口
+   (`bootstrap.launch`) が `AGENT_KIT_STARTED` に記録するので、起動入口の git 呼び出しが遅い分も締め切りに含まれる。
+   締め切りまでに統合済みと確認できなければ未統合として拒否する。hook が想定する登録 timeout と実際の登録値の
+   一致はテストで固定する。
 
 ## runtime ファイルを足すときの規則
 

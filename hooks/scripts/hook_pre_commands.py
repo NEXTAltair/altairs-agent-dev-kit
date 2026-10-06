@@ -42,10 +42,13 @@ LOG_DIR: Path = get_log_dir(PROJECT_ROOT)
 WORKTREE_ROOT: Path = PROJECT_ROOT / ".agents" / "worktree"
 SHARED_UV_ENV_NAME = "UV_PROJECT_ENVIRONMENT"
 SHARED_UV_ENV_VALUE: str = str(PROJECT_ROOT / ".venv")
-# hook が登録 timeout (Claude: hooks/hooks.json、Codex: install_harness.CODEX_HOOKS。どちらも 15 秒) で
-# 打ち切られると、どちらのクライアントでも tool 呼び出しはそのまま実行される (fail-open)。
-# git branch -D の統合判定 (gh のネットワーク呼び出しを含む) はこの予算内で終え、終わらなければ未統合として拒否する。
-INTEGRATION_BUDGET_SECONDS = 10.0
+# この hook の登録 timeout (Claude: hooks/hooks.json、Codex: install_harness.CODEX_HOOKS)。打ち切られると、
+# どちらのクライアントでも tool 呼び出しはそのまま実行される (fail-open)。git branch -D の統合判定
+# (gh のネットワーク呼び出しを含む) は、起動入口の git 呼び出しも含めてプロセス起動からこの時間内に終え、
+# 終わらなければ未統合として拒否する。余裕は Python の起動と応答の出力のため。
+REGISTERED_TIMEOUT_SECONDS = 15
+TIMEOUT_MARGIN_SECONDS = 2
+IMPORTED_AT = time.monotonic()
 
 
 def log_debug(message: str) -> None:
@@ -192,6 +195,22 @@ def check_draft_pr_create(command: str) -> str | None:
     )
 
 
+def _integration_deadline() -> float:
+    """統合判定の締め切り (time.monotonic 基準)。
+
+    起動入口 (hooks/bootstrap.py) が記録したプロセス起動時刻から数える。記録が無い・壊れている場合
+    (直接起動、起動コードが古い登録) はこの module の読み込み時刻から数える。
+    """
+    started = IMPORTED_AT
+    try:
+        recorded = float(os.environ["AGENT_KIT_STARTED"])
+    except (KeyError, ValueError):
+        recorded = None
+    if recorded is not None and 0 <= time.monotonic() - recorded <= REGISTERED_TIMEOUT_SECONDS:
+        started = recorded
+    return started + REGISTERED_TIMEOUT_SECONDS - TIMEOUT_MARGIN_SECONDS
+
+
 def _remaining(deadline: float, cap: float) -> float | None:
     """deadline までの残り秒数を cap 以下で返す。使い切っていれば None。"""
     remaining = deadline - time.monotonic()
@@ -321,7 +340,7 @@ def check_branch_force_delete(command: str) -> str | None:
         # 形が読めない場合は判定せず他ルールに委ねる (誤許可を避ける)
         return None
 
-    deadline = time.monotonic() + INTEGRATION_BUDGET_SECONDS
+    deadline = _integration_deadline()
     unmerged = [b for b in branch_args if not _branch_is_integrated(b, deadline)]
     if not unmerged:
         log_debug(f"ALLOW branch -D (integrated): {branch_args}")
@@ -331,7 +350,7 @@ def check_branch_force_delete(command: str) -> str | None:
     log_debug(f"BLOCKING: branch -D on unmerged branch(es): {unmerged} (timed out: {timed_out})")
     return (
         f"🚫 git branch -D: base へ未統合の可能性があるブランチを強制削除しようとしています: {unmerged}\n"
-        + (f"→ 統合判定 (git / gh) が {INTEGRATION_BUDGET_SECONDS:g} 秒以内に終わらなかったため未統合として扱いました。\n"
+        + (f"→ 統合判定 (git / gh) が hook の制限時間 ({REGISTERED_TIMEOUT_SECONDS} 秒) 内に終わらなかったため未統合として扱いました。\n"
            if timed_out else "")
         + "→ squash merge 済みなら main へ pull 後に再試行 (統合判定が通ります)。\n"
         "→ 本当に破棄してよい場合のみ、ユーザー確認の上で実行してください。"

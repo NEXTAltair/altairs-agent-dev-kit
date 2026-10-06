@@ -8,6 +8,7 @@ import re
 import runpy
 import subprocess
 import sys
+import time
 import types
 
 LOCK = ".agent-kit/hooks.lock.json"
@@ -145,6 +146,9 @@ def failure(event, error, provider="claude"):
 
 
 def launch(script, provider="claude", event="PreToolUse", consumer=False, plugin=None):
+    # Hooks bound their own work by the registered timeout, which counts from process start;
+    # the Git calls below already spend part of it. Same process, so monotonic time is comparable.
+    os.environ["AGENT_KIT_STARTED"] = repr(time.monotonic())
     try:
         active, shared = roots()
         lock = json.loads((active / LOCK).read_text(encoding="utf-8"))

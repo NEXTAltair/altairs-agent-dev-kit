@@ -191,6 +191,16 @@ def test_runtime_failures_and_consumer_startup(tmp_path):
     assert result.returncode == 0, result.stderr
     assert Path(result.stdout.strip()) == target.resolve()
     assert not list((target / ".agent-kit/runtimes").rglob("__pycache__"))
+    # The launcher records process start so hooks can bound their work by the registered timeout.
+    consumer.write_text(
+        "import os, time\nprint(time.monotonic() - float(os.environ['AGENT_KIT_STARTED']))\n", encoding="utf-8"
+    )
+    result = run(".claude/hooks/teammate.py", "TeammateIdle", True)
+    assert result.returncode == 0, result.stderr
+    assert 0 <= float(result.stdout) < 10
+    consumer.write_text(
+        "from hook_common import find_project_root\nprint(find_project_root())\n", encoding="utf-8"
+    )
     lock_path = target / ".agent-kit/hooks.lock.json"
     original = lock_path.read_text(encoding="utf-8")
     for damaged in ("{}", "[]", '{"runtime":123}',

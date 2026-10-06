@@ -161,7 +161,7 @@ def _load_hook_module():
 
 
 def test_branch_force_delete_denies_when_integration_check_runs_out_of_time(tmp_path, monkeypatch):
-    """gh が応答しなくても登録 timeout 前に判定を打ち切り、未統合として拒否する (fail-open させない)"""
+    """起動処理で時間を使い、gh も応答しなくても、登録 timeout 前に判定を打ち切って拒否する (fail-open させない)"""
     import os
     import time
     hook = _load_hook_module()
@@ -181,16 +181,34 @@ def test_branch_force_delete_denies_when_integration_check_runs_out_of_time(tmp_
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.chdir(repo)
     monkeypatch.setattr(hook, "LOG_DIR", tmp_path / "logs")
-    monkeypatch.setattr(hook, "INTEGRATION_BUDGET_SECONDS", 1.0)
+    # 起動入口の git 呼び出しなどで、締め切りまで残り 1 秒になったところから判定が始まる。
+    spent = hook.REGISTERED_TIMEOUT_SECONDS - hook.TIMEOUT_MARGIN_SECONDS - 1
+    monkeypatch.setenv("AGENT_KIT_STARTED", repr(time.monotonic() - spent))
     started = time.monotonic()
     reason = hook.check_branch_force_delete("git branch -D squashed-elsewhere")
     assert time.monotonic() - started < 3
     assert reason and "squashed-elsewhere" in reason
-    assert "以内に終わらなかった" in reason
+    assert "制限時間" in reason
 
 
-def test_integration_budget_fits_registered_timeouts():
-    """統合判定の予算は、起動と他の git 呼び出しの余裕を残して両クライアントの登録 timeout に収まる"""
+def test_integration_deadline_counts_from_process_start(monkeypatch):
+    """締め切りは起動入口が記録した起動時刻から数え、記録が無い・不正なら module の読み込み時刻から数える"""
+    import time
+    hook = _load_hook_module()
+    window = hook.REGISTERED_TIMEOUT_SECONDS - hook.TIMEOUT_MARGIN_SECONDS
+    now = time.monotonic()
+    monkeypatch.setattr(hook, "IMPORTED_AT", now)
+    monkeypatch.setenv("AGENT_KIT_STARTED", repr(now - 4))
+    assert abs(hook._integration_deadline() - (now - 4 + window)) < 0.01
+    for invalid in ("broken", repr(now + 60), repr(now - 3600)):
+        monkeypatch.setenv("AGENT_KIT_STARTED", invalid)
+        assert abs(hook._integration_deadline() - (now + window)) < 0.01, invalid
+    monkeypatch.delenv("AGENT_KIT_STARTED")
+    assert abs(hook._integration_deadline() - (now + window)) < 0.01
+
+
+def test_registered_timeout_matches_both_clients():
+    """hook が想定する登録 timeout は、Claude と Codex の実際の登録値と一致する"""
     hook = _load_hook_module()
     sys.path.insert(0, str(HOOK.parents[2] / "scripts"))
     from install_harness import CODEX_HOOKS
@@ -198,5 +216,5 @@ def test_integration_budget_fits_registered_timeouts():
     claude_timeout = next(handler["timeout"] for group in plugin["hooks"]["PreToolUse"]
                           for handler in group["hooks"] if "hook_pre_commands.py" in handler["args"])
     codex_timeout = next(timeout for _, _, script, timeout in CODEX_HOOKS if script == "hook_pre_commands.py")
-    for timeout in (claude_timeout, codex_timeout):
-        assert hook.INTEGRATION_BUDGET_SECONDS + 3 <= timeout
+    assert claude_timeout == codex_timeout == hook.REGISTERED_TIMEOUT_SECONDS
+    assert 0 < hook.TIMEOUT_MARGIN_SECONDS < hook.REGISTERED_TIMEOUT_SECONDS
