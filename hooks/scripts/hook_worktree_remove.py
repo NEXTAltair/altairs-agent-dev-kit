@@ -69,21 +69,22 @@ def _timeout(deadline: float, cap: float) -> float:
     return timeout
 
 
-def _registered_worktrees(shared_root: Path, deadline: float) -> dict[Path, str | None]:
-    """登録された worktree のパスと HEAD のコミット。ディレクトリが消えた登録も含む。
+def _registered_worktrees(shared_root: Path, deadline: float) -> dict[Path, str | None] | None:
+    """登録された worktree のパスと HEAD のコミット。ディレクトリが消えた登録も含む。一覧を取れなければ None。
 
     改行を含むパスでも壊れないよう NUL 区切り (`-z`、Git 2.36+) で読み、未対応の Git では行区切りに戻す。
+    UTF-8 でない名前も surrogateescape で元のバイト列のまま扱う。
     """
     for options, separator in ((["--porcelain", "-z"], "\0"), (["--porcelain"], "\n")):
         result = subprocess.run(
             ["git", "worktree", "list", *options],
-            cwd=shared_root, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            cwd=shared_root, capture_output=True, text=True, encoding="utf-8", errors="surrogateescape",
             timeout=_timeout(deadline, LIST_TIMEOUT),
         )
         if result.returncode == 0:
             break
     else:
-        return {}
+        return None
     worktrees: dict[Path, str | None] = {}
     current = None
     for line in result.stdout.split(separator):
@@ -120,15 +121,20 @@ def _disposable(relative: str) -> bool:
     return not relative.endswith("/") and any(fnmatch.fnmatchcase(parts[-1], p) for p in DISPOSABLE_FILES)
 
 
+def _raise(error: OSError) -> None:
+    raise error
+
+
 def _first_kept_ignored(worktree: Path, deadline: float) -> str | None:
     """削除で失われる ignore 対象のうち、作り直せないものを 1 つ返す (無ければ None)。
 
     ignore 対象のディレクトリは Git がまとめて 1 件で返すので、中を走査して確かめる。
-    作り直せないファイルが見つかった時点で止めるので、大きなディレクトリでも走査は短い。
+    作り直せないものが見つかった時点で止めるので、大きなディレクトリでも走査は短い。
+    確かめられないもの (Git の表示と実体が合わない、読めない、走査しない symlink のディレクトリ) も残す側に倒す。
     """
     result = subprocess.run(
         ["git", "status", "--porcelain=v1", "-z", "--ignored=matching", "--untracked-files=normal"],
-        cwd=worktree, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=worktree, capture_output=True, text=True, encoding="utf-8", errors="surrogateescape",
         timeout=_timeout(deadline, STATUS_TIMEOUT),
     )
     if result.returncode != 0:
@@ -139,15 +145,22 @@ def _first_kept_ignored(worktree: Path, deadline: float) -> str | None:
         relative = entry[len("!! "):]
         if _disposable(relative):
             continue
-        if not relative.endswith("/"):
+        if not relative.endswith("/") or not os.path.lexists(worktree / relative):
             return relative
-        for directory, subdirectories, files in os.walk(worktree / relative):
-            _timeout(deadline, STATUS_TIMEOUT)
-            base = Path(directory).relative_to(worktree).as_posix()
-            subdirectories[:] = [d for d in subdirectories if not _disposable(f"{base}/{d}/")]
-            for name in files:
-                if not _disposable(f"{base}/{name}"):
-                    return f"{base}/{name}"
+        try:
+            for directory, subdirectories, files in os.walk(worktree / relative, onerror=_raise):
+                _timeout(deadline, STATUS_TIMEOUT)
+                base = Path(directory).relative_to(worktree).as_posix()
+                for name in subdirectories:
+                    # os.walk は symlink のディレクトリを辿らないので、中身を確かめずに消さない。
+                    if os.path.islink(os.path.join(directory, name)) and not _disposable(f"{base}/{name}/"):
+                        return f"{base}/{name}"
+                subdirectories[:] = [d for d in subdirectories if not _disposable(f"{base}/{d}/")]
+                for name in files:
+                    if not _disposable(f"{base}/{name}"):
+                        return f"{base}/{name}"
+        except OSError as error:
+            return f"{relative} (走査できません: {error})"
     return None
 
 
@@ -178,6 +191,8 @@ def main() -> None:
 
     try:
         registered = _registered_worktrees(shared_root, deadline)
+        if registered is None:
+            _fail("git worktree list に失敗したため、登録を確かめられず残します")
         if target not in registered:
             if not target.exists():
                 print(f"already removed: {target}", file=sys.stderr)

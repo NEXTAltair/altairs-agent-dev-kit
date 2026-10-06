@@ -286,3 +286,58 @@ def test_registered_timeout_matches_plugin_registration():
     registered = plugin["hooks"]["WorktreeRemove"][0]["hooks"][0]["timeout"]
     source = (HOOKS / "hook_worktree_remove.py").read_text(encoding="utf-8")
     assert f"REGISTERED_TIMEOUT_SECONDS = {registered}\n" in source
+
+
+def test_keeps_ignored_directory_with_a_name_that_is_not_utf8(tmp_path):
+    # 名前を置換して読むと実在しないパスを走査し、中身を確かめずに消してしまう。
+    import os
+    init_repo_ignoring(tmp_path, "bad*/\n")
+    worktree = create(tmp_path, "non-utf8")
+    directory = os.fsencode(worktree) + b"/bad\xff"
+    os.mkdir(directory)
+    with open(directory + b"/secret", "wb") as stream:
+        stream.write(b"token")
+    result = remove(tmp_path, worktree)
+    assert result.returncode != 0
+    assert os.path.exists(directory + b"/secret")
+
+
+def test_keeps_ignored_directory_symlinks(tmp_path):
+    # os.walk は symlink のディレクトリを辿らない。中身を確かめられないので残す。
+    import os
+    init_repo_ignoring(tmp_path, "local/\n")
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "notes.txt").write_text("keep", encoding="utf-8")
+    worktree = create(tmp_path, "symlinked")
+    (worktree / "local").mkdir()
+    os.symlink(data, worktree / "local/link", target_is_directory=True)
+    result = remove(tmp_path, worktree)
+    assert result.returncode != 0
+    assert "local/link" in result.stderr
+    assert (worktree / "local/link").is_symlink()
+
+
+def test_fails_when_worktree_list_fails_even_if_directory_is_gone(tmp_path):
+    # 一覧を取れないときに「登録なし」とみなすと、残った登録を消さずに成功扱いしてしまう。
+    import shutil
+    real_git = shutil.which("git")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    wrapper = bin_dir / "git"
+    wrapper.write_text(
+        "#!/bin/sh\n"
+        'case " $* " in *" worktree list "*) echo "fatal: simulated failure" >&2; exit 128;; esac\n'
+        f'exec "{real_git}" "$@"\n',
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    repo = tmp_path / "repo"
+    init_repo(repo)
+    worktree = create(repo, "listing-fails")
+    shutil.rmtree(worktree)
+    result = remove(repo, worktree, path=f"{bin_dir}:/usr/bin:/bin")
+    assert result.returncode != 0
+    assert "worktree list" in result.stderr
+    listed = subprocess.run(["git", "worktree", "list"], cwd=repo, capture_output=True, text=True)
+    assert str(worktree) in listed.stdout
