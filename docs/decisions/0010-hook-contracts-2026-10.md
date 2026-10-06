@@ -38,12 +38,13 @@ plugin の `${CLAUDE_PLUGIN_ROOT}` / `${user_config.*}`、Codex の `commandWind
 2. **WorktreeRemove** (`hook_worktree_remove.py`) を Claude の登録 (plugin・インストール型の両方) に追加する。
    削除は安全側に限定する:
    - `<共有 checkout>/.agents/worktree/` の直下で、同じ repository に登録された linked worktree だけ
-   - `git worktree remove` を `--force` なしで実行する。未コミット・未追跡ファイル、lock、init 済み submodule
+   - hook 自身の cwd を共有 checkout へ移してから (Windows は cwd にあるディレクトリを削除できない)、
+     `git worktree remove` を `--force` なしで実行する。ディレクトリが既に無い登録は Git が登録だけを消す。未コミット・未追跡ファイル、lock、init 済み submodule
      (WorktreeCreate が init する) を含む worktree は Git が拒否し、hook は非ゼロで終わって worktree は残る。
      submodule 側の未 push commit を巻き込んで消さないため、ここで `--force` は使わない
 3. **編集ゲート**は `notebook_path` と Codex の `apply_patch` を読む。パッチの `*** Add File:` /
-   `*** Update File:` / `*** Delete File:` / `*** Move to:` 行 (Codex のパーサと同じく前後の空白を除く) を
-   payload の `cwd` 基準で解決する。Claude の matcher は `Edit|Write|MultiEdit|NotebookEdit`
+   `*** Update File:` / `*** Delete File:` / `*** Move to:` 行を payload の `cwd` 基準で解決する。見出しの判定は
+   Codex のパーサに合わせ、Update File の hunk 内では末尾空白だけを除く (行頭が空白の行は context 行で、見出しではない)。Claude の matcher は `Edit|Write|MultiEdit|NotebookEdit`
    (古いクライアント向けに `MultiEdit` を残す)、Codex には `apply_patch` の group を追加する。
 4. **起動失敗時の `cd` 例外** (ADR-0009) は Codex でも `tool_name` が `Bash` (または旧版の無し) のときだけ適用する。
 5. **整合 lint** は、固定した runtime が `hook_worktree_remove.py` を含む場合だけ `WorktreeRemove` を必須にする。

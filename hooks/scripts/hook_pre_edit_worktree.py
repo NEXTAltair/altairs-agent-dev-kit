@@ -35,7 +35,6 @@ Claude Code Hooks - Pre-Edit Worktree Gate (PreToolUse Hook)
 
 import json
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -49,10 +48,29 @@ from hook_common import (
 
 DEFAULT_PROTECTED_DIRS = ["src", "tests"]
 
-# Codex apply_patch のファイル見出し。Codex のパーサと同じく行の前後空白を除いて判定する。
-PATCH_FILE_HEADER = re.compile(
-    r"^[ \t]*\*\*\* (?:Add File|Update File|Delete File|Move to): (.+?)[ \t]*\r?$", re.MULTILINE
-)
+PATCH_FILE_HEADERS = ("*** Add File: ", "*** Delete File: ", "*** Update File: ")
+PATCH_MOVE_TO = "*** Move to: "
+
+
+def _patch_paths(patch: str) -> list[str]:
+    """Codex apply_patch の編集先パスを、Codex のパーサと同じ規則で列挙する。
+
+    見出しは行の前後空白を除いて判定するが、Update File の hunk 内では末尾空白だけを除く。
+    hunk 内で行頭が空白の行は context 行なので、見出しと同じ文字列でもパスとみなさない。
+    """
+    paths = []
+    in_update = False
+    for raw in patch.split("\n"):
+        line = raw.rstrip() if in_update else raw.strip()
+        marker = next((m for m in PATCH_FILE_HEADERS if line.startswith(m)), None)
+        if marker:
+            paths.append(line[len(marker):].strip())
+            in_update = marker == "*** Update File: "
+        elif in_update and line.startswith(PATCH_MOVE_TO):
+            paths.append(line[len(PATCH_MOVE_TO):].strip())
+        elif line == "*** End Patch":
+            in_update = False
+    return [path for path in paths if path]
 
 
 def _target_paths(input_data: dict) -> list[str]:
@@ -69,7 +87,7 @@ def _target_paths(input_data: dict) -> list[str]:
         return []
     cwd = input_data.get("cwd")
     base = Path(cwd) if isinstance(cwd, str) and cwd else Path.cwd()
-    return [str(base / name.strip()) for name in PATCH_FILE_HEADER.findall(patch) if name.strip()]
+    return [str(base / name) for name in _patch_paths(patch)]
 
 
 def _resolve(file_path: str) -> Path | None:

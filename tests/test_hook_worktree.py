@@ -104,6 +104,11 @@ def test_codex_apply_patch_allowed_outside_protected_dirs_and_in_worktree(tmp_pa
     # 追加行の中身はパス指定ではない。
     result = run_apply_patch_hook(patch_of("*** Add File: docs/note.md", "+*** Add File: src/x.py"), tmp_path)
     assert pretooluse_deny_reason(result) is None
+    # Update hunk 内の行頭空白付きの行は context 行。見出しと同じ文字列でもパスではない (Codex のパーサと同じ)。
+    for context in (" *** Update File: src/x.py", " *** Move to: src/x.py", "-*** Delete File: tests/a.py"):
+        patch = patch_of("*** Update File: docs/a.md", "@@", context)
+        result = run_apply_patch_hook(patch, tmp_path)
+        assert pretooluse_deny_reason(result) is None, context
     # 相対パスは Codex の作業ディレクトリ (payload の cwd) 基準: worktree 内なら許可。
     wt = tmp_path / ".agents" / "worktree" / "fix-1"
     (wt / "src").mkdir(parents=True)

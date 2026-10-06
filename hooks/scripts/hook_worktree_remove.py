@@ -21,6 +21,7 @@ Claude Code が渡す payload:
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -79,14 +80,17 @@ def main() -> None:
     if target.parent != worktree_base:
         _fail(f"{target} は {worktree_base} 直下ではないため削除しません")
 
-    if not target.exists():
-        # 既に消えている: 登録だけ残っていても Git の prune 対象なので成功扱い。
-        print(f"already removed: {target}", file=sys.stderr)
-        sys.exit(0)
-
     try:
-        if target not in _registered_worktrees(shared_root):
+        registered = target in _registered_worktrees(shared_root)
+        if not registered:
+            if not target.exists():
+                print(f"already removed: {target}", file=sys.stderr)
+                sys.exit(0)
             _fail(f"{target} はこの repository の linked worktree として登録されていません")
+        # Windows はプロセスの cwd にあるディレクトリを削除できない。hook 自身が削除対象の中で
+        # 起動されていても消せるよう、先に共有 checkout へ移る。ディレクトリが既に無い登録は
+        # git worktree remove が登録だけを消す (残すと同名の WorktreeCreate が失敗する)。
+        os.chdir(shared_root)
         result = subprocess.run(
             ["git", "worktree", "remove", "--", str(target)],
             cwd=shared_root, capture_output=True, text=True, encoding="utf-8", errors="replace",

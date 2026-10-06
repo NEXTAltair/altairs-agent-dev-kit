@@ -63,6 +63,19 @@ def test_removes_clean_worktree_created_by_pair_hook(tmp_path):
     assert str(worktree) not in listed.stdout
 
 
+def test_clears_registration_of_already_deleted_directory(tmp_path):
+    # 登録が残ったままだと、同名の WorktreeCreate が "missing but already registered" で失敗する。
+    import shutil
+    init_repo(tmp_path)
+    worktree = create(tmp_path, "deleted-by-hand")
+    shutil.rmtree(worktree)
+    result = remove(tmp_path, worktree)
+    assert result.returncode == 0, result.stderr
+    listed = subprocess.run(["git", "worktree", "list"], cwd=tmp_path, capture_output=True, text=True)
+    assert str(worktree) not in listed.stdout
+    assert create(tmp_path, "deleted-by-hand") == worktree
+
+
 def test_keeps_worktree_with_uncommitted_or_untracked_files(tmp_path):
     init_repo(tmp_path)
     worktree = create(tmp_path, "dirty")
