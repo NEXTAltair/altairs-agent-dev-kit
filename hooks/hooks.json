@@ -15,7 +15,7 @@
               "hook_pre_commands.py",
               "PreToolUse"
             ],
-            "timeout": 15
+            "timeout": 30
           },
           {
             "type": "command",
@@ -28,7 +28,7 @@
               "hook_pre_pr_submodule_check.py",
               "PreToolUse"
             ],
-            "timeout": 15
+            "timeout": 30
           }
         ]
       },
@@ -46,7 +46,7 @@
               "hook_pre_edit_worktree.py",
               "PreToolUse"
             ],
-            "timeout": 5
+            "timeout": 30
           }
         ]
       }
@@ -65,7 +65,7 @@
               "hook_response_monitor.py",
               "Stop"
             ],
-            "timeout": 5
+            "timeout": 30
           }
         ]
       }

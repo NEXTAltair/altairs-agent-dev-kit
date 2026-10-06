@@ -48,7 +48,7 @@ SHARED_UV_ENV_VALUE: str = str(PROJECT_ROOT / ".venv")
 # どちらのクライアントでも tool 呼び出しはそのまま実行される (fail-open)。git branch -D の統合判定
 # (gh のネットワーク呼び出しを含む) はプロセス起動からこの時間内 (hook_common.hook_deadline) に終え、
 # 終わらなければ未統合として拒否する。
-REGISTERED_TIMEOUT_SECONDS = 15
+REGISTERED_TIMEOUT_SECONDS = 30
 TIMEOUT_MARGIN_SECONDS = 2
 
 

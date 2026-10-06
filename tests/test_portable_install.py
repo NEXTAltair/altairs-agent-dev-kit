@@ -676,3 +676,18 @@ def test_new_bootstrap_accepts_locks_published_before_optional_runtime_files(tmp
             # A hook the pin does not carry fails closed; Claude Code then keeps the worktree.
             assert result.returncode == 2
             assert "not part of the pinned runtime" in result.stderr
+
+
+def test_registered_timeouts_cover_worst_case_startup():
+    """Both clients run the tool when a hook times out; startup must never use up the timeout."""
+    import bootstrap
+    from install_harness import CODEX_HOOKS
+    # Launcher: --show-toplevel, --show-superproject-working-tree, --git-common-dir.
+    # Hook: hook_common.find_shared_root. Margin: interpreter start, the hook's own decision.
+    startup = 3 * bootstrap.GIT_TIMEOUT + 5
+    plugin = json.loads((KIT / "hooks/hooks.json").read_text(encoding="utf-8"))
+    timeouts = {(event, handler["args"][-2]): handler["timeout"]
+                for event, groups in plugin["hooks"].items() for group in groups for handler in group["hooks"]}
+    timeouts.update({("codex " + event, script): timeout for event, _, script, timeout in CODEX_HOOKS})
+    for hook, timeout in timeouts.items():
+        assert timeout >= startup + 10, hook

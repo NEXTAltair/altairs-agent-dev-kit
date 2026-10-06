@@ -62,11 +62,12 @@ def hook_bootstrap(script: str, provider: str = "claude", event: str = "PreToolU
 
 # Codex events, matchers and timeouts (seconds, same as hooks/hooks.json). Codex reports every
 # shell call as "Bash" and file edits as "apply_patch"; it has no WorktreeCreate. Append new
-# groups: trust is keyed by position.
+# groups: trust is keyed by position. Both clients ignore a hook that times out, so each timeout
+# must cover the launcher's worst-case Git calls before the hook can decide (see bootstrap.py).
 CODEX_HOOKS = (
-    ("PreToolUse", "Bash|PowerShell", "hook_pre_commands.py", 15),
-    ("PreToolUse", "apply_patch", "hook_pre_edit_worktree.py", 5),
-    ("Stop", None, "hook_response_monitor.py", 5),
+    ("PreToolUse", "Bash|PowerShell", "hook_pre_commands.py", 30),
+    ("PreToolUse", "apply_patch", "hook_pre_edit_worktree.py", 30),
+    ("Stop", None, "hook_response_monitor.py", 30),
 )
 
 

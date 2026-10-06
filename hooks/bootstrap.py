@@ -30,19 +30,22 @@ REQUIRED = {
 OPTIONAL = {
     "hooks/scripts/hook_worktree_remove.py",
 }
+# Startup runs up to three Git calls (more only inside nested submodules), each bounded by this.
+# Clients ignore a hook that exceeds its registered timeout, so registrations must cover them.
+GIT_TIMEOUT = 5
 
 
 def git_root(cwd, *args):
     return Path(subprocess.check_output(
         ["git", "-C", str(cwd), "rev-parse", *args],
-        text=True, encoding="utf-8", stderr=subprocess.PIPE, timeout=5,
+        text=True, encoding="utf-8", stderr=subprocess.PIPE, timeout=GIT_TIMEOUT,
     ).strip()).resolve()
 
 
 def superproject(checkout):
     output = subprocess.check_output(
         ["git", "-C", str(checkout), "rev-parse", "--show-superproject-working-tree"],
-        text=True, encoding="utf-8", stderr=subprocess.PIPE, timeout=5,
+        text=True, encoding="utf-8", stderr=subprocess.PIPE, timeout=GIT_TIMEOUT,
     ).strip()
     return Path(output).resolve() if output else None
 
