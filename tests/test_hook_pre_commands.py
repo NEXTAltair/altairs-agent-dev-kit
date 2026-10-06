@@ -191,22 +191,6 @@ def test_branch_force_delete_denies_when_integration_check_runs_out_of_time(tmp_
     assert "制限時間" in reason
 
 
-def test_integration_deadline_counts_from_process_start(monkeypatch):
-    """締め切りは起動入口が記録した起動時刻から数え、記録が無い・不正なら module の読み込み時刻から数える"""
-    import time
-    hook = _load_hook_module()
-    window = hook.REGISTERED_TIMEOUT_SECONDS - hook.TIMEOUT_MARGIN_SECONDS
-    now = time.monotonic()
-    monkeypatch.setattr(hook, "IMPORTED_AT", now)
-    monkeypatch.setenv("AGENT_KIT_STARTED", repr(now - 4))
-    assert abs(hook._integration_deadline() - (now - 4 + window)) < 0.01
-    for invalid in ("broken", repr(now + 60), repr(now - 3600)):
-        monkeypatch.setenv("AGENT_KIT_STARTED", invalid)
-        assert abs(hook._integration_deadline() - (now + window)) < 0.01, invalid
-    monkeypatch.delenv("AGENT_KIT_STARTED")
-    assert abs(hook._integration_deadline() - (now + window)) < 0.01
-
-
 def test_registered_timeout_matches_both_clients():
     """hook が想定する登録 timeout は、Claude と Codex の実際の登録値と一致する"""
     hook = _load_hook_module()

@@ -41,6 +41,12 @@ plugin の `${CLAUDE_PLUGIN_ROOT}` / `${user_config.*}`、Codex の `commandWind
    - worktree の HEAD が、worktree を消しても残る ref (ブランチ・リモート追跡・タグ等) から到達できるときだけ。
      WorktreeCreate は detached HEAD で作るので、ブランチを切らずに commit した worktree は clean でも残す
      (`git worktree remove` はこの commit の消失を止めない)
+   - ignore 対象のファイルが、作り直せる Python のキャッシュ (`__pycache__` / `.pytest_cache` / `.mypy_cache` /
+     `.ruff_cache` / `.hypothesis`、`*.pyc` / `*.pyo`、`.coverage*`) と kit の hook ログ (`.claude/logs/` / `.codex/logs/`)
+     だけのときだけ。`git worktree remove` は `--force` なしでも ignore 対象 (.env、ローカル DB、実験の出力等) を
+     確認なしで消す。ignore 対象のディレクトリは中を走査し、作り直せないファイルが 1 つでもあれば残す
+   - プロセス起動から登録 timeout (60 秒) − 余裕 5 秒の締め切りまでに確認と削除を終えられるときだけ。
+     残りが 10 秒未満なら削除を始めない (途中で打ち切られた削除で worktree が半端に残るのを避ける)
    - hook 自身の cwd を共有 checkout へ移してから (Windows は cwd にあるディレクトリを削除できない)、
      `git worktree remove` を `--force` なしで実行する。ディレクトリが既に無い登録は Git が登録だけを消す。未コミット・未追跡ファイル、lock、init 済み submodule
      (WorktreeCreate が init する) を含む worktree は Git が拒否し、hook は非ゼロで終わって worktree は残る。
@@ -55,7 +61,8 @@ plugin の `${CLAUDE_PLUGIN_ROOT}` / `${user_config.*}`、Codex の `commandWind
    (fail-open)。`hook_pre_commands.py` の `git branch -D` 判定は git と `gh` (最大 10 秒) を呼ぶため、登録 timeout (5 秒) で
    打ち切られると未統合ブランチの削除がそのまま通っていた。`hook_pre_commands.py` の登録 timeout を両クライアントで
    15 秒にし、判定の締め切りを「プロセス起動 + 15 秒 − 余裕 2 秒」にする。起動時刻は起動入口
-   (`bootstrap.launch`) が `AGENT_KIT_STARTED` に記録するので、起動入口の git 呼び出しが遅い分も締め切りに含まれる。
+   (`bootstrap.launch`) が `AGENT_KIT_STARTED` に記録するので、起動入口の git 呼び出しが遅い分も締め切りに含まれる
+   (締め切りの計算は `hook_common.hook_deadline` に置き、WorktreeRemove と共有する)。
    締め切りまでに統合済みと確認できなければ未統合として拒否する。hook が想定する登録 timeout と実際の登録値の
    一致はテストで固定する。
 

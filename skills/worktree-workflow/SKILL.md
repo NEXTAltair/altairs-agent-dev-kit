@@ -11,8 +11,9 @@ metadata:
 方針は [rules/git-workflow.md](../../rules/git-workflow.md) が持つので、ここでは繰り返さない。
 このスキルは Claude Code と Codex の両方で使う。Claude Code では `--worktree` や isolation 起動時に
 kit の WorktreeCreate hook が作成を代行するので、その場合は「作成後の手順」から入る。終了時の削除も
-WorktreeRemove hook が代行するが、未コミット変更・lock・init 済み submodule を含む worktree と、
-ブランチを切らずに commit した (どのブランチからも到達できない) worktree は残すので Phase 6 で片付ける。
+WorktreeRemove hook が代行するが、未コミット変更・lock・init 済み submodule を含む worktree、
+ブランチを切らずに commit した (どのブランチからも到達できない) worktree、キャッシュ以外の ignore 対象
+(.env 等) がある worktree は残すので Phase 6 で片付ける。
 
 ## When to Use
 
@@ -183,7 +184,7 @@ git worktree list --porcelain
 | `remove` が `contains modified or untracked files` で失敗 | 中身を確認。必要なら commit/stash、捨ててよければ `--force` |
 | worktree ディレクトリを手で消してしまった | `git worktree prune` で登録を消し、ブランチは `git branch -d` |
 | hook が worktree 作成に失敗してセッションが起動しない | stderr の `git worktree add 失敗` を読む。多くは同名ディレクトリの残骸。`prune` 後に再実行 |
-| `WorktreeRemove hook failed; kept worktree` | hook は `--force` を使わないので、変更・lock・submodule を含む worktree は残る。HEAD がどのブランチからも到達できない場合も残る (必要なら `git branch <name>` で保持)。中身を確認して Phase 6 の手順で削除 |
+| `WorktreeRemove hook failed; kept worktree` | hook は `--force` を使わないので、変更・lock・submodule を含む worktree は残る。HEAD がどのブランチからも到達できない場合 (必要なら `git branch <name>` で保持) と、キャッシュ以外の ignore 対象がある場合も残る。中身を確認して Phase 6 の手順で削除 |
 
 ## Related
 

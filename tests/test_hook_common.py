@@ -58,3 +58,19 @@ def test_load_hook_rules_missing_files(tmp_path, monkeypatch):
 def test_get_log_dir(tmp_path):
     assert hook_common.get_log_dir(tmp_path) == tmp_path / ".claude" / "logs"
     assert not (tmp_path / ".claude" / "logs").exists()  # mkdir しない契約
+
+
+def test_hook_deadline_counts_from_process_start(monkeypatch):
+    """締め切りは起動入口が記録した起動時刻から数え、記録が無い・不正なら module の読み込み時刻から数える"""
+    import time
+    now = time.monotonic()
+    monkeypatch.setattr(hook_common, "_IMPORTED_AT", now)
+    monkeypatch.setenv("AGENT_KIT_STARTED", repr(now - 4))
+    assert abs(hook_common.hook_deadline(15, 2) - (now - 4 + 13)) < 0.01
+    for invalid in ("broken", repr(now + 60), repr(now - 3600)):
+        monkeypatch.setenv("AGENT_KIT_STARTED", invalid)
+        assert abs(hook_common.hook_deadline(15, 2) - (now + 13)) < 0.01, invalid
+    monkeypatch.delenv("AGENT_KIT_STARTED")
+    assert abs(hook_common.hook_deadline(15, 2) - (now + 13)) < 0.01
+    assert hook_common.remaining_seconds(now - 1, 5) is None
+    assert hook_common.remaining_seconds(time.monotonic() + 100, 5) == 5

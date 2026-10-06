@@ -34,7 +34,9 @@ from hook_common import (
     find_project_root,
     find_shared_root,
     get_log_dir,
+    hook_deadline,
     load_hook_rules,
+    remaining_seconds,
 )
 
 PROJECT_ROOT: Path = Path.cwd()
@@ -44,11 +46,10 @@ SHARED_UV_ENV_NAME = "UV_PROJECT_ENVIRONMENT"
 SHARED_UV_ENV_VALUE: str = str(PROJECT_ROOT / ".venv")
 # この hook の登録 timeout (Claude: hooks/hooks.json、Codex: install_harness.CODEX_HOOKS)。打ち切られると、
 # どちらのクライアントでも tool 呼び出しはそのまま実行される (fail-open)。git branch -D の統合判定
-# (gh のネットワーク呼び出しを含む) は、起動入口の git 呼び出しも含めてプロセス起動からこの時間内に終え、
-# 終わらなければ未統合として拒否する。余裕は Python の起動と応答の出力のため。
+# (gh のネットワーク呼び出しを含む) はプロセス起動からこの時間内 (hook_common.hook_deadline) に終え、
+# 終わらなければ未統合として拒否する。
 REGISTERED_TIMEOUT_SECONDS = 15
 TIMEOUT_MARGIN_SECONDS = 2
-IMPORTED_AT = time.monotonic()
 
 
 def log_debug(message: str) -> None:
@@ -195,32 +196,10 @@ def check_draft_pr_create(command: str) -> str | None:
     )
 
 
-def _integration_deadline() -> float:
-    """統合判定の締め切り (time.monotonic 基準)。
-
-    起動入口 (hooks/bootstrap.py) が記録したプロセス起動時刻から数える。記録が無い・壊れている場合
-    (直接起動、起動コードが古い登録) はこの module の読み込み時刻から数える。
-    """
-    started = IMPORTED_AT
-    try:
-        recorded = float(os.environ["AGENT_KIT_STARTED"])
-    except (KeyError, ValueError):
-        recorded = None
-    if recorded is not None and 0 <= time.monotonic() - recorded <= REGISTERED_TIMEOUT_SECONDS:
-        started = recorded
-    return started + REGISTERED_TIMEOUT_SECONDS - TIMEOUT_MARGIN_SECONDS
-
-
-def _remaining(deadline: float, cap: float) -> float | None:
-    """deadline までの残り秒数を cap 以下で返す。使い切っていれば None。"""
-    remaining = deadline - time.monotonic()
-    return min(cap, remaining) if remaining > 0 else None
-
-
 def _default_base_branch(deadline: float) -> str:
     """統合先の base ブランチ (main / master) を検出する。"""
     for base in ("main", "master"):
-        timeout = _remaining(deadline, 5)
+        timeout = remaining_seconds(deadline, 5)
         if timeout is None:
             break
         try:
@@ -249,7 +228,7 @@ def _branch_is_integrated(branch: str, deadline: float) -> bool:
     base = _default_base_branch(deadline)
 
     # 1. 通常マージ / fast-forward (branch が base の祖先)
-    if (timeout := _remaining(deadline, 5)) is None:
+    if (timeout := remaining_seconds(deadline, 5)) is None:
         return False
     try:
         result = subprocess.run(
@@ -263,7 +242,7 @@ def _branch_is_integrated(branch: str, deadline: float) -> bool:
         pass
 
     # 2. squash merge 直後: branch のツリーが base に対して固有差分を持たない
-    if (timeout := _remaining(deadline, 5)) is None:
+    if (timeout := remaining_seconds(deadline, 5)) is None:
         return False
     try:
         result = subprocess.run(
@@ -277,7 +256,7 @@ def _branch_is_integrated(branch: str, deadline: float) -> bool:
         pass
 
     # 3. merged PR が存在すれば統合済み (squash merge を確実に検出)
-    if (timeout := _remaining(deadline, 10)) is None:
+    if (timeout := remaining_seconds(deadline, 10)) is None:
         return False
     try:
         result = subprocess.run(
@@ -340,7 +319,7 @@ def check_branch_force_delete(command: str) -> str | None:
         # 形が読めない場合は判定せず他ルールに委ねる (誤許可を避ける)
         return None
 
-    deadline = _integration_deadline()
+    deadline = hook_deadline(REGISTERED_TIMEOUT_SECONDS, TIMEOUT_MARGIN_SECONDS)
     unmerged = [b for b in branch_args if not _branch_is_integrated(b, deadline)]
     if not unmerged:
         log_debug(f"ALLOW branch -D (integrated): {branch_args}")

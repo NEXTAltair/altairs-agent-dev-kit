@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -30,6 +31,31 @@ def _default_rules_dir() -> Path:
 
 
 DEFAULT_RULES_DIR = _default_rules_dir()
+_IMPORTED_AT = time.monotonic()
+
+
+def hook_deadline(registered_timeout: float, margin: float) -> float:
+    """hook が登録 timeout 内に応答を返すための締め切り (time.monotonic 基準)。
+
+    両クライアントとも timeout で打ち切った hook の判定を使わずに処理を続ける (PreToolUse なら tool を
+    実行する)。起動入口 (hooks/bootstrap.py) が記録したプロセス起動時刻 AGENT_KIT_STARTED から数えるので、
+    起動入口の git 呼び出しの時間も含まれる。記録が無い・不正な場合 (直接起動、起動コードが古い登録) は
+    この module の読み込み時刻から数える。margin は Python の起動と応答の出力のための余裕。
+    """
+    started = _IMPORTED_AT
+    try:
+        recorded = float(os.environ["AGENT_KIT_STARTED"])
+    except (KeyError, ValueError):
+        recorded = None
+    if recorded is not None and 0 <= time.monotonic() - recorded <= registered_timeout:
+        started = recorded
+    return started + registered_timeout - margin
+
+
+def remaining_seconds(deadline: float, cap: float) -> float | None:
+    """deadline までの残り秒数を cap 以下で返す。使い切っていれば None。"""
+    remaining = deadline - time.monotonic()
+    return min(cap, remaining) if remaining > 0 else None
 
 
 def find_project_root() -> Path:

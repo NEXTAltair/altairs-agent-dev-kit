@@ -33,7 +33,10 @@ deletes only linked worktrees of the same repository directly under
 `.agents/worktree/`, and never passes `--force`: worktrees with uncommitted or
 untracked files, locks, or initialized submodules stay in place, and so do worktrees
 whose HEAD no branch, remote-tracking ref or tag contains (WorktreeCreate starts them
-detached, so commits made before creating a branch would otherwise be lost). The edit gate also
+detached, so commits made before creating a branch would otherwise be lost). Git also
+deletes ignored files without `--force`, so the hook keeps any worktree with ignored
+files other than Python caches and the kit's own hook logs. Hooks bound their work by
+the registered timeout counted from process start (`hook_common.hook_deadline`). The edit gate also
 covers `NotebookEdit`, which passes `tool_input.notebook_path`.
 
 Codex hooks are enabled by default (feature key `hooks`; `codex_hooks` is a

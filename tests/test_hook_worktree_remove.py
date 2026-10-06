@@ -29,13 +29,14 @@ def init_repo(path: Path) -> None:
     git(path, "commit", "-q", "-m", "init")
 
 
-def run_hook(name: str, payload: dict, cwd: Path, path: str = "/usr/bin:/bin") -> subprocess.CompletedProcess:
+def run_hook(name: str, payload: dict, cwd: Path, path: str = "/usr/bin:/bin",
+             extra_env: dict | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(HOOKS / f"{name}.py")], input=json.dumps(payload),
         capture_output=True, text=True, encoding="utf-8", cwd=cwd, timeout=60,
         # WorktreeCreate の submodule init がローカル (file://) の submodule を取得できるようにする。
         env={"CLAUDE_PROJECT_DIR": str(cwd), "PATH": path, "GIT_CONFIG_COUNT": "1",
-             "GIT_CONFIG_KEY_0": "protocol.file.allow", "GIT_CONFIG_VALUE_0": "always"},
+             "GIT_CONFIG_KEY_0": "protocol.file.allow", "GIT_CONFIG_VALUE_0": "always", **(extra_env or {})},
     )
 
 
@@ -45,11 +46,12 @@ def create(repo: Path, name: str) -> Path:
     return Path(result.stdout.strip())
 
 
-def remove(repo: Path, worktree: Path | str, path: str = "/usr/bin:/bin") -> subprocess.CompletedProcess:
+def remove(repo: Path, worktree: Path | str, path: str = "/usr/bin:/bin",
+           extra_env: dict | None = None) -> subprocess.CompletedProcess:
     return run_hook(
         "hook_worktree_remove",
         {"cwd": str(repo), "hook_event_name": "WorktreeRemove", "worktree_path": str(worktree)},
-        repo, path,
+        repo, path, extra_env,
     )
 
 
@@ -226,3 +228,61 @@ def test_missing_payload_fails_and_already_removed_succeeds(tmp_path):
     assert result.returncode != 0
     result = remove(tmp_path, tmp_path / ".agents/worktree/never-created")
     assert result.returncode == 0, result.stderr
+
+
+def init_repo_ignoring(path: Path, patterns: str) -> None:
+    init_repo(path)
+    (path / ".gitignore").write_text(patterns, encoding="utf-8")
+    git(path, "add", ".gitignore")
+    git(path, "commit", "-q", "-m", "ignore")
+
+
+def test_keeps_worktree_with_ignored_files_that_cannot_be_regenerated(tmp_path):
+    # git worktree remove は --force なしでも ignore 対象を確認なしで消す。
+    init_repo_ignoring(tmp_path, "*.secret\n.claude/\n")
+    for name, content in (("x.secret", "token"), (".claude/settings.local.json", "{}")):
+        worktree = create(tmp_path, "ignored-" + Path(name).stem.strip("."))
+        file = worktree / name
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text(content, encoding="utf-8")
+        result = remove(tmp_path, worktree)
+        assert result.returncode != 0, name
+        assert name in result.stderr
+        assert file.read_text(encoding="utf-8") == content
+
+
+def test_removes_worktree_whose_ignored_files_are_only_caches_and_kit_logs(tmp_path):
+    init_repo_ignoring(tmp_path, "__pycache__/\n*.pyc\n.pytest_cache/\n.coverage\n.claude/\n")
+    worktree = create(tmp_path, "caches-only")
+    for name in ("src/__pycache__/a.cpython-313.pyc", "b.pyc", ".pytest_cache/v/cache/nodeids",
+                 ".coverage", ".claude/logs/hook_pre_commands_debug.log"):
+        file = worktree / name
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text("x", encoding="utf-8")
+    result = remove(tmp_path, worktree)
+    assert result.returncode == 0, result.stderr
+    assert not worktree.exists()
+
+
+def test_does_not_start_removal_without_time_to_finish(tmp_path):
+    # 起動入口の記録から締め切りが近いと分かれば、途中で打ち切られる削除を始めない。
+    import time
+    hook_module = HOOKS / "hook_worktree_remove.py"
+    namespace: dict = {}
+    for line in hook_module.read_text(encoding="utf-8").splitlines():
+        if line.startswith(("REGISTERED_TIMEOUT_SECONDS =", "TIMEOUT_MARGIN_SECONDS =")):
+            exec(line.split("#")[0], namespace)
+    init_repo(tmp_path)
+    worktree = create(tmp_path, "late")
+    spent = namespace["REGISTERED_TIMEOUT_SECONDS"] - namespace["TIMEOUT_MARGIN_SECONDS"] - 3
+    result = remove(tmp_path, worktree, extra_env={"AGENT_KIT_STARTED": repr(time.monotonic() - spent)})
+    assert result.returncode != 0
+    assert "登録 timeout" in result.stderr
+    assert worktree.is_dir()
+
+
+def test_registered_timeout_matches_plugin_registration():
+    plugin = json.loads((HOOKS.parent / "hooks.json").read_text(encoding="utf-8"))
+    registered = plugin["hooks"]["WorktreeRemove"][0]["hooks"][0]["timeout"]
+    source = (HOOKS / "hook_worktree_remove.py").read_text(encoding="utf-8")
+    assert f"REGISTERED_TIMEOUT_SECONDS = {registered}\n" in source
