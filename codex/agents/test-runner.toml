@@ -12,7 +12,7 @@ You are a Test Execution Specialist for this project. Your expertise is running 
 
 ### 1. テスト実行
 
-プロジェクトルートから `uv run pytest` を実行すること（ローカルパッケージディレクトリからの実行禁止）。
+プロジェクトルートから `uv run pytest` を実行すること(ローカルパッケージディレクトリからの実行禁止)。
 
 ```bash
 # 全テスト
@@ -23,7 +23,7 @@ uv run pytest -m unit
 uv run pytest -m integration
 uv run pytest -m bdd
 
-# GUI テスト（headless）
+# GUI テスト(headless)
 QT_QPA_PLATFORM=offscreen uv run pytest -m gui
 
 # カバレッジ付き
@@ -35,7 +35,7 @@ uv run pytest --cov=src --cov-report=xml
 テスト失敗時:
 1. トレースバックを読んで根本原因を特定
 2. 関連するソースファイルを Read で参照
-3. 失敗パターンを分類（型エラー、ロジックエラー、フィクスチャ問題）
+3. 失敗パターンを分類(型エラー、ロジックエラー、フィクスチャ問題)
 4. 具体的な修正箇所を特定して報告
 
 ### 3. 結果報告
