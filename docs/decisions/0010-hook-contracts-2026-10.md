@@ -58,6 +58,8 @@ plugin の `${CLAUDE_PLUGIN_ROOT}` / `${user_config.*}`、Codex の `commandWind
    `*** Update File:` / `*** Delete File:` / `*** Move to:` 行を payload の `cwd` 基準で解決する。見出しの判定は
    Codex のパーサに合わせ、Update File の hunk 内では末尾空白だけを除く (行頭が空白の行は context 行で、見出しではない)。Claude の matcher は `Edit|Write|MultiEdit|NotebookEdit`
    (古いクライアント向けに `MultiEdit` を残す)、Codex には `apply_patch` の group を追加する。
+   作業 checkout が Git checkout なのに共有 checkout を特定できない場合は、作業 checkout を代わりに使わず
+   編集を拒否する (`hook_common.find_shared_root(strict=True)`)。
 4. **起動失敗時の `cd` 例外** (ADR-0009) は Codex でも `tool_name` が `Bash` (または旧版の無し) のときだけ適用する。
 5. **整合 lint** は、固定した runtime が `hook_worktree_remove.py` を含む場合だけ `WorktreeRemove` を必須にする。
 6. **timeout による素通りを防ぐ**。hook の timeout・異常終了・不正な JSON は、両クライアントとも tool 呼び出しを止めない
