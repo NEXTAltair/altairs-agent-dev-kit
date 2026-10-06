@@ -23,6 +23,12 @@ REQUIRED = {
     "hooks/rules/pre_pr_submodule_check.default.json",
     "hooks/rules/response_monitor.default.json",
 }
+# Keep REQUIRED frozen: a newer plugin bootstrap validates branch pins published by older
+# kits, and a file added there would reject every such lock. New runtime files go here;
+# a lock without them still validates and only the hook that needs one fails closed.
+OPTIONAL = {
+    "hooks/scripts/hook_worktree_remove.py",
+}
 
 
 def git_root(cwd, *args):
@@ -79,7 +85,10 @@ def is_bare_cd(payload, provider):
         return False
     tool_input = payload["tool_input"]
     if provider == "codex":
-        # Codex omits tool_name, may carry the command in `cmd`, and runs the host shell.
+        # Codex names every shell call "Bash" (older releases sent no tool_name and put the
+        # command in `cmd`), yet runs it in the host shell. apply_patch also sends `command`.
+        if payload.get("tool_name") not in (None, "Bash"):
+            return False
         shell = "PowerShell" if os.name == "nt" else "Bash"
         command = tool_input.get("command") or tool_input.get("cmd")
     else:

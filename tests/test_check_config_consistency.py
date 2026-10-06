@@ -77,3 +77,23 @@ def test_consistent_project_passes(tmp_path):
                         consistency={"required_env": ["MY_ENV"]}, hook_files=["guard.py"])
     result = run(root)
     assert result.returncode == 0
+
+
+def test_worktree_remove_required_only_when_pinned_runtime_ships_it(tmp_path):
+    def wired(*events: str) -> dict:
+        return {"hooks": {event: [{"hooks": [{"type": "command", "command": "python3"}]}] for event in events}}
+
+    lock = tmp_path / ".agent-kit" / "hooks.lock.json"
+    lock.parent.mkdir()
+    # A branch pinned to an older kit cannot run WorktreeRemove, so it is not demanded.
+    lock.write_text(json.dumps({"files": {"hooks/scripts/hook_worktree_create.py": "0" * 64}}), encoding="utf-8")
+    root = make_project(tmp_path, wired("PreToolUse", "Stop", "WorktreeCreate"))
+    assert run(root).returncode == 0
+    # Once the pin ships the hook, WorktreeCreate alone would leave every hook worktree behind.
+    lock.write_text(json.dumps({"files": {"hooks/scripts/hook_worktree_remove.py": "0" * 64}}), encoding="utf-8")
+    result = run(root)
+    assert result.returncode == 1
+    assert "WorktreeRemove" in result.stdout
+    (tmp_path / ".claude" / "settings.json").write_text(
+        json.dumps(wired("PreToolUse", "Stop", "WorktreeCreate", "WorktreeRemove")), encoding="utf-8")
+    assert run(root).returncode == 0

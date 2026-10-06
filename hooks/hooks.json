@@ -33,7 +33,7 @@
         ]
       },
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
@@ -85,6 +85,25 @@
               "WorktreeCreate"
             ],
             "timeout": 120
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${user_config.python_command}",
+            "args": [
+              "-I",
+              "-X",
+              "utf8",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/plugin_entry.py",
+              "hook_worktree_remove.py",
+              "WorktreeRemove"
+            ],
+            "timeout": 60
           }
         ]
       }

@@ -9,6 +9,7 @@
 * [ADR-0007: unknowns discovery を汎用ルールとして追加する](decisions/0007-add-unknowns-discovery-rule.md) — AI エージェントがプロンプト・計画・ルールに書かれていない前提を推測で埋める問題を、Fable 固有の skill ではなく作業横断の unknowns discovery ルールとして扱う
 * [ADR-0008: PR autoloop は bounded time-based loop として扱い hook は adapter 分離する](decisions/0008-loop-contracts-and-hook-adapters.md) — PR 保守 loop の観測可能な停止条件と、provider 別の起動設定・共有 policy・branch 固定 runtime の責務を定義する
 * [ADR-0009: submodule の中にいても hook を動かし、動かせない場所からは cd で戻れるようにする](decisions/0009-submodule-cwd-and-bare-cd-escape.md) — submodule に cd しただけで全ツールが拒否され、戻る cd まで拒否されて詰む問題への対処。submodule は親 checkout の一部として扱い、hook が起動できない場所でも「引数 1 つの cd」だけは通す
+* [ADR-0010: Claude Code 2.1.290 / Codex 0.160.1 の hook 契約に追従する](decisions/0010-hook-contracts-2026-10.md) — WorktreeCreate の payload 名、WorktreeRemove の追加、NotebookEdit と Codex apply_patch の編集ゲート漏れを、実バイナリ・ソース・公式ドキュメントで確認して修正し、古い branch pin を壊さない runtime ファイル追加の規則を定めた
 * [altairs-agent-dev-kit 設計書](superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — LoRAIro の開発標準を汎用化し独立リポジトリとして配布するための設計方針
 * [altairs-agent-dev-kit Implementation Plan](superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — skills / rules / hooks / agents / Codex 設定を汎用化し3経路で導入できる kit を構築する実装計画
 * [docs-freshness-audit skill 設計](superpowers/specs/2026-07-05-docs-freshness-audit-skill-design.md)

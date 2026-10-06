@@ -4,6 +4,7 @@
 `command` は Linux、`commandWindows` は Windows の Python を起動し、標準ライブラリだけの
 共通 bootstrap が作業 checkout の `.agent-kit/hooks.lock.json` に対応する runtime を検証する。
 override は作業 checkout、runtime は版固定した `.agent-kit/runtimes/<ID>` から読む。
+登録するのは PreToolUse (`Bash` にコマンド制御、`apply_patch` に共有 checkout の編集ゲート) と Stop。
 
 このディレクトリのスクリプトは kit ソース配置用 adapter。consumer にはコピーしない。
 以前の adapter / `.claude/hooks/*.py` の直接登録は生成された起動設定へ移行する。

@@ -3,7 +3,13 @@
 Claude Code Hooks - Pre-Edit Worktree Gate (PreToolUse Hook)
 
 プロジェクト本体のアプリコード (デフォルト `src/`, `tests/`) を共有 checkout
-(project root) で直接 Edit/Write しようとしたらブロックする。
+(project root) で直接編集しようとしたらブロックする。
+
+対象ツールと編集先パスの取り出し方:
+- Claude Code: Edit / Write / MultiEdit は `tool_input.file_path`、NotebookEdit は `tool_input.notebook_path`
+- Codex: `tool_name: "apply_patch"` の `tool_input.command` (パッチ本文) にある
+  `*** Add File:` / `*** Update File:` / `*** Delete File:` / `*** Move to:` 行。
+  相対パスは payload の `cwd` (Codex の作業ディレクトリ) を基準に解決する。
 
 目的:
 - ISSUE 解決・機能開発は「worktree 作成 → そこで実装」を機械的に強制する。
@@ -29,6 +35,7 @@ Claude Code Hooks - Pre-Edit Worktree Gate (PreToolUse Hook)
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -41,6 +48,28 @@ from hook_common import (
 )
 
 DEFAULT_PROTECTED_DIRS = ["src", "tests"]
+
+# Codex apply_patch のファイル見出し。Codex のパーサと同じく行の前後空白を除いて判定する。
+PATCH_FILE_HEADER = re.compile(
+    r"^[ \t]*\*\*\* (?:Add File|Update File|Delete File|Move to): (.+?)[ \t]*\r?$", re.MULTILINE
+)
+
+
+def _target_paths(input_data: dict) -> list[str]:
+    """tool 呼び出しが編集するファイルパスを列挙する (読めなければ空)。"""
+    tool_input = input_data.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return []
+    # Edit / Write / MultiEdit は file_path、NotebookEdit は notebook_path を使う。
+    path = tool_input.get("file_path") or tool_input.get("notebook_path")
+    if isinstance(path, str) and path:
+        return [path]
+    patch = tool_input.get("command")
+    if input_data.get("tool_name") != "apply_patch" or not isinstance(patch, str):
+        return []
+    cwd = input_data.get("cwd")
+    base = Path(cwd) if isinstance(cwd, str) and cwd else Path.cwd()
+    return [str(base / name.strip()) for name in PATCH_FILE_HEADER.findall(patch) if name.strip()]
 
 
 def _resolve(file_path: str) -> Path | None:
@@ -94,10 +123,11 @@ def main() -> None:
         if os.environ.get("ALLOW_MAIN_EDIT") == "1":
             sys.exit(0)
 
-        input_data: dict = json.load(sys.stdin)
-        tool_input = input_data.get("tool_input", {})
-        file_path = tool_input.get("file_path", "")
-        if not file_path:
+        input_data = json.load(sys.stdin)
+        if not isinstance(input_data, dict):
+            sys.exit(0)
+        file_paths = _target_paths(input_data)
+        if not file_paths:
             sys.exit(0)
 
         active_root = find_project_root()
@@ -106,8 +136,9 @@ def main() -> None:
         rules = load_hook_rules("pre_edit_worktree", active_root)
         protected_dirs = rules.get("protected_dirs", DEFAULT_PROTECTED_DIRS)
 
-        if _is_blocked(file_path, repo_root, worktree_root, protected_dirs):
-            emit_pretooluse_deny(_build_message(file_path, repo_root, worktree_root))
+        for file_path in file_paths:
+            if _is_blocked(file_path, repo_root, worktree_root, protected_dirs):
+                emit_pretooluse_deny(_build_message(file_path, repo_root, worktree_root))
 
         sys.exit(0)
 

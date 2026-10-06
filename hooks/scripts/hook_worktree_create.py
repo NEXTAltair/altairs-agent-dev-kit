@@ -10,8 +10,12 @@ Claude Code が呼ぶ **provider**。worktree を作成し、そのパスを std
 セッション/サブエージェント起動が中断される。デフォルト作成へのフォールバックはない)。
 
 Claude Code が渡す payload:
-  {session_id, cwd, hook_event_name: "WorktreeCreate",
-   worktree_name, worktree_path (提案パス), source_ref}
+  {session_id, transcript_path, cwd, hook_event_name: "WorktreeCreate", name}
+  `name` は worktree の slug (例: `bold-oak-a3f2`)。旧版の `worktree_name` にもフォールバックする。
+  base ref は渡されないため `cwd` の HEAD から作る (旧版の `source_ref` があればそれを使う)。
+
+削除は対の hook_worktree_remove.py (WorktreeRemove) が担う。WorktreeCreate だけを登録すると
+Claude Code は hook が作った worktree を消さず残すため、両方を登録する。
 
 重要: ここで `uv sync` (や同等の依存インストール) は実行しない。
   共有の実行環境 (project_root/.venv 等) は main checkout から既に sync 済みで、
@@ -57,8 +61,8 @@ def main() -> None:
     repo = Path(data.get("cwd") or find_project_root()).resolve()
     shared_root = find_shared_root(repo)
     worktree_base = shared_root / WORKTREE_SUBDIR
-    # 現行スキーマは worktree_name。旧 payload 形状 (name) にもフォールバックする。
-    worktree_path = worktree_base / _sanitize(data.get("worktree_name") or data.get("name") or "agent")
+    # 現行スキーマは name。旧 payload 形状 (worktree_name) にもフォールバックする。
+    worktree_path = worktree_base / _sanitize(data.get("name") or data.get("worktree_name") or "agent")
     source_ref = data.get("source_ref") or "HEAD"
 
     try:

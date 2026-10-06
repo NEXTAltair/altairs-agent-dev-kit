@@ -49,10 +49,14 @@ def main() -> int:
     # A branch pin therefore implies the installed Claude event contract by default.
     required_events = consistency.get("required_hook_events")
     if required_events is None:
-        required_events = (
-            ["PreToolUse", "Stop", "WorktreeCreate"]
-            if (root / ".agent-kit/hooks.lock.json").exists() else []
-        )
+        lock_path = root / ".agent-kit/hooks.lock.json"
+        required_events = ["PreToolUse", "Stop", "WorktreeCreate"] if lock_path.exists() else []
+        # WorktreeCreate alone makes Claude Code keep every hook-created worktree. Require the
+        # paired event once the pinned runtime ships its hook; older pins cannot run it.
+        lock = load_json(lock_path)
+        files = lock.get("files") if isinstance(lock, dict) else None
+        if isinstance(files, dict) and "hooks/scripts/hook_worktree_remove.py" in files:
+            required_events.append("WorktreeRemove")
     for event in required_events:
         groups = settings.get("hooks", {}).get(event, [])
         registered = any(

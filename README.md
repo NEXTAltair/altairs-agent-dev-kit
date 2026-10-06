@@ -19,7 +19,7 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 |---|---|---|
 | skills | 14 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
 | rules | 11 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守・問題解決の姿勢等) |
-| hooks | 5 本 + 共通基盤 | `hooks/scripts/*.py` (+ `hook_common.py`)、設定は `hooks/rules/*.default.json` |
+| hooks | 6 本 + 共通基盤 | `hooks/scripts/*.py` (+ `hook_common.py`)、設定は `hooks/rules/*.default.json` |
 | agents | 8 本 | `agents/*.md` (Claude Code サブエージェント定義) |
 | Codex 設定 | 一式 | `codex/config.toml.template`, `codex/agents/*.toml` |
 | 設定整合 lint | 1本 | `scripts/check_config_consistency.py` |

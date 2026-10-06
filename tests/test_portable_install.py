@@ -93,6 +93,26 @@ def test_installed_launchers_and_overrides(tmp_path):
             assert result.returncode == 0, result.stderr
             if event == "PreToolUse":
                 assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    # Codex file edits arrive as apply_patch; the edit gate resolves patch paths against cwd.
+    edit_group = next(group for group in codex["hooks"]["PreToolUse"] if group.get("matcher") == "apply_patch")
+    handler = edit_group["hooks"][0]
+    if os.name == "nt":
+        command = ["powershell", "-NoProfile", "-Command", handler["commandWindows"]]
+    else:
+        command = ["sh", "-c", handler["command"]]
+    for cwd, name, denied in ((target, "src/app.py", True), (nested, "../src/app.py", True),
+                              (nested, str(target / "tests/a.py"), True), (worktree, "src/app.py", False)):
+        patch = "*** Begin Patch\n*** Update File: " + name + "\n@@\n+x\n*** End Patch\n"
+        result = subprocess.run(
+            command,
+            input=json.dumps({"cwd": str(cwd), "hook_event_name": "PreToolUse", "tool_name": "apply_patch",
+                              "tool_input": {"command": patch}}),
+            cwd=cwd, text=True, encoding="utf-8", capture_output=True, timeout=20,
+        )
+        assert result.returncode == 0, result.stderr
+        assert bool(result.stdout.strip()) is denied, (cwd, name, result.stdout)
+        if denied:
+            assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
 def test_install_runtime_refuses_non_git_target(tmp_path):
@@ -318,7 +338,8 @@ def test_plugin_and_all_registered_events(tmp_path):
                 for handler in group["hooks"]:
                     args = [arg.replace("${CLAUDE_PLUGIN_ROOT}", str(KIT)) for arg in handler["args"]]
                     payload = {"tool_input": {"command": "git reset --hard", "file_path": str(target / "src/a.py")},
-                               "last_assistant_message": "forbiddenword", "worktree_name": prefix}
+                               "last_assistant_message": "forbiddenword", "name": prefix,
+                               "worktree_path": str(target / ".agents/worktree" / prefix)}
                     result = subprocess.run(
                         [sys.executable, *args], cwd=target, input=json.dumps(payload),
                         text=True, encoding="utf-8", capture_output=True, timeout=30,
@@ -328,8 +349,11 @@ def test_plugin_and_all_registered_events(tmp_path):
                     if event == "Stop":
                         assert json.loads(result.stdout)["decision"] == "block"
                     elif event == "WorktreeCreate":
+                        assert Path(result.stdout.strip()) == Path(payload["worktree_path"]).resolve()
                         assert Path(result.stdout.strip()).is_dir()
-                    elif group.get("matcher") == "Edit|Write|MultiEdit":
+                    elif event == "WorktreeRemove":
+                        assert not Path(payload["worktree_path"]).exists()
+                    elif group.get("matcher") == "Edit|Write|MultiEdit|NotebookEdit":
                         assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
@@ -598,12 +622,47 @@ def test_nested_repository_stays_unsupported_but_permits_bare_cd(tmp_path):
     payload = json.dumps({"tool_name": "PowerShell", "tool_input": {"command": "Set-Location ..; Remove-Item x"}})
     result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload)
     assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
-    # Codex payloads carry the command in `cmd` and omit `tool_name`; its shell is the host shell.
-    for command, escaped in (("cd ..", True), ("cd .. && ls", False), ("ls", False)):
-        payload = json.dumps({"tool_input": {"cmd": command}})
-        result = _launch("hook_pre_commands.py", "PreToolUse", vendored, payload, provider="codex")
-        assert result.returncode == 0, result.stderr
-        assert (result.stdout == "") is escaped, command
+    # Codex reports every shell call as "Bash" with `command` (older releases: no tool_name and
+    # `cmd`) but runs the host shell. apply_patch payloads also carry `command` and never escape.
+    for payload_shape in ({"tool_name": "Bash", "key": "command"}, {"key": "cmd"}):
+        for command, escaped in (("cd ..", True), ("cd .. && ls", False), ("ls", False)):
+            payload = {"tool_input": {payload_shape["key"]: command}}
+            if "tool_name" in payload_shape:
+                payload["tool_name"] = payload_shape["tool_name"]
+            result = _launch("hook_pre_commands.py", "PreToolUse", vendored, json.dumps(payload), provider="codex")
+            assert result.returncode == 0, result.stderr
+            assert (result.stdout == "") is escaped, (payload_shape, command)
+    payload = json.dumps({"tool_name": "apply_patch", "tool_input": {"command": "cd .."}})
+    result = _launch("hook_pre_edit_worktree.py", "PreToolUse", vendored, payload, provider="codex")
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
     payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target / "x"), "content": "cd"}})
     result = _launch("hook_pre_edit_worktree.py", "PreToolUse", vendored, payload)
     assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_new_bootstrap_accepts_locks_published_before_optional_runtime_files(tmp_path, monkeypatch):
+    """Plugin updates ship a newer bootstrap than the branch pin; older locks must keep working."""
+    import install_harness as installer
+    target = tmp_path / "older pin"
+    target.mkdir()
+    subprocess.run(["git", "init", str(target)], check=True, capture_output=True)
+    with monkeypatch.context() as patch:
+        patch.setattr(installer, "OPTIONAL", set())
+        lock = installer.install_runtime(target)
+    assert "hooks/scripts/hook_worktree_remove.py" not in lock["files"]
+    plugin = json.loads((KIT / "hooks/hooks.json").read_text(encoding="utf-8"))
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git reset --hard"},
+                          "worktree_path": str(target / ".agents/worktree/x")})
+    for event, script in (("PreToolUse", "hook_pre_commands.py"), ("WorktreeRemove", "hook_worktree_remove.py")):
+        handler = next(handler for group in plugin["hooks"][event] for handler in group["hooks"]
+                       if script in handler["args"])
+        args = [arg.replace("${CLAUDE_PLUGIN_ROOT}", str(KIT)) for arg in handler["args"]]
+        result = subprocess.run([sys.executable, *args], cwd=target, input=payload,
+                                text=True, encoding="utf-8", capture_output=True, timeout=30)
+        if event == "PreToolUse":
+            assert result.returncode == 0, result.stderr
+            assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+        else:
+            # A hook the pin does not carry fails closed; Claude Code then keeps the worktree.
+            assert result.returncode == 2
+            assert "not part of the pinned runtime" in result.stderr
