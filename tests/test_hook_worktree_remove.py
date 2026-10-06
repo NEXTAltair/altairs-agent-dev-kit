@@ -29,12 +29,12 @@ def init_repo(path: Path) -> None:
     git(path, "commit", "-q", "-m", "init")
 
 
-def run_hook(name: str, payload: dict, cwd: Path) -> subprocess.CompletedProcess:
+def run_hook(name: str, payload: dict, cwd: Path, path: str = "/usr/bin:/bin") -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(HOOKS / f"{name}.py")], input=json.dumps(payload),
         capture_output=True, text=True, encoding="utf-8", cwd=cwd, timeout=60,
         # WorktreeCreate の submodule init がローカル (file://) の submodule を取得できるようにする。
-        env={"CLAUDE_PROJECT_DIR": str(cwd), "PATH": "/usr/bin:/bin", "GIT_CONFIG_COUNT": "1",
+        env={"CLAUDE_PROJECT_DIR": str(cwd), "PATH": path, "GIT_CONFIG_COUNT": "1",
              "GIT_CONFIG_KEY_0": "protocol.file.allow", "GIT_CONFIG_VALUE_0": "always"},
     )
 
@@ -45,11 +45,11 @@ def create(repo: Path, name: str) -> Path:
     return Path(result.stdout.strip())
 
 
-def remove(repo: Path, worktree: Path | str) -> subprocess.CompletedProcess:
+def remove(repo: Path, worktree: Path | str, path: str = "/usr/bin:/bin") -> subprocess.CompletedProcess:
     return run_hook(
         "hook_worktree_remove",
         {"cwd": str(repo), "hook_event_name": "WorktreeRemove", "worktree_path": str(worktree)},
-        repo,
+        repo, path,
     )
 
 
@@ -74,6 +74,40 @@ def test_clears_registration_of_already_deleted_directory(tmp_path):
     listed = subprocess.run(["git", "worktree", "list"], cwd=tmp_path, capture_output=True, text=True)
     assert str(worktree) not in listed.stdout
     assert create(tmp_path, "deleted-by-hand") == worktree
+
+
+def test_removes_worktree_of_repository_whose_path_contains_a_newline(tmp_path):
+    # porcelain の行区切りではパスが途中で切れ、未登録と誤判定して残してしまう。
+    repo = tmp_path / "line\nbreak repo"
+    init_repo(repo)
+    worktree = create(repo, "agent-nl")
+    result = remove(repo, worktree)
+    assert result.returncode == 0, result.stderr
+    assert not worktree.exists()
+
+
+def test_falls_back_to_line_records_on_git_without_nul_output(tmp_path):
+    # `git worktree list -z` は Git 2.36+。古い Git でも行区切りで判定して削除できる。
+    import shutil
+    real_git = shutil.which("git")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    wrapper = bin_dir / "git"
+    wrapper.write_text(
+        "#!/bin/sh\n"
+        'case " $* " in *" worktree list "*" -z "*) echo "error: unknown switch \\`z\\x27" >&2; exit 129;; esac\n'
+        f'exec "{real_git}" "$@"\n',
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    repo = tmp_path / "repo"
+    init_repo(repo)
+    worktree = create(repo, "old-git")
+    old_git = subprocess.run([str(wrapper), "worktree", "list", "--porcelain", "-z"], cwd=repo, capture_output=True)
+    assert old_git.returncode == 129
+    result = remove(repo, worktree, path=f"{bin_dir}:/usr/bin:/bin")
+    assert result.returncode == 0, result.stderr
+    assert not worktree.exists()
 
 
 def test_keeps_detached_commits_until_a_ref_holds_them(tmp_path):

@@ -35,7 +35,7 @@ from hook_common import find_project_root, find_shared_root
 # hook_worktree_create.py の WORKTREE_SUBDIR と一致させる。
 WORKTREE_SUBDIR = ".agents/worktree"
 # 内部の git 呼び出しの合計を登録 timeout (hooks.json の 60 秒) より短く保ち、途中で kill されないようにする。
-LIST_TIMEOUT = 10
+LIST_TIMEOUT = 5  # 古い Git では 2 回呼ぶ
 CONTAINS_TIMEOUT = 10
 REMOVE_TIMEOUT = 30
 
@@ -46,17 +46,23 @@ def _fail(message: str) -> None:
 
 
 def _registered_worktrees(shared_root: Path) -> dict[Path, str | None]:
-    """登録された worktree のパスと HEAD のコミット。ディレクトリが消えた登録も含む。"""
-    result = subprocess.run(
-        ["git", "worktree", "list", "--porcelain"],
-        cwd=shared_root, capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=LIST_TIMEOUT,
-    )
-    if result.returncode != 0:
+    """登録された worktree のパスと HEAD のコミット。ディレクトリが消えた登録も含む。
+
+    改行を含むパスでも壊れないよう NUL 区切り (`-z`、Git 2.36+) で読み、未対応の Git では行区切りに戻す。
+    """
+    for options, separator in ((["--porcelain", "-z"], "\0"), (["--porcelain"], "\n")):
+        result = subprocess.run(
+            ["git", "worktree", "list", *options],
+            cwd=shared_root, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=LIST_TIMEOUT,
+        )
+        if result.returncode == 0:
+            break
+    else:
         return {}
     worktrees: dict[Path, str | None] = {}
     current = None
-    for line in result.stdout.splitlines():
+    for line in result.stdout.split(separator):
         if line.startswith("worktree "):
             current = Path(line[len("worktree "):]).resolve()
             worktrees[current] = None
