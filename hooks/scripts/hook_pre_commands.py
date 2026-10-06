@@ -23,6 +23,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,10 @@ LOG_DIR: Path = get_log_dir(PROJECT_ROOT)
 WORKTREE_ROOT: Path = PROJECT_ROOT / ".agents" / "worktree"
 SHARED_UV_ENV_NAME = "UV_PROJECT_ENVIRONMENT"
 SHARED_UV_ENV_VALUE: str = str(PROJECT_ROOT / ".venv")
+# hook が登録 timeout (Claude: hooks/hooks.json、Codex: install_harness.CODEX_HOOKS。どちらも 15 秒) で
+# 打ち切られると、どちらのクライアントでも tool 呼び出しはそのまま実行される (fail-open)。
+# git branch -D の統合判定 (gh のネットワーク呼び出しを含む) はこの予算内で終え、終わらなければ未統合として拒否する。
+INTEGRATION_BUDGET_SECONDS = 10.0
 
 
 def log_debug(message: str) -> None:
@@ -187,14 +192,23 @@ def check_draft_pr_create(command: str) -> str | None:
     )
 
 
-def _default_base_branch() -> str:
+def _remaining(deadline: float, cap: float) -> float | None:
+    """deadline までの残り秒数を cap 以下で返す。使い切っていれば None。"""
+    remaining = deadline - time.monotonic()
+    return min(cap, remaining) if remaining > 0 else None
+
+
+def _default_base_branch(deadline: float) -> str:
     """統合先の base ブランチ (main / master) を検出する。"""
     for base in ("main", "master"):
+        timeout = _remaining(deadline, 5)
+        if timeout is None:
+            break
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "--verify", "--quiet", base],
                 capture_output=True,
-                timeout=5,
+                timeout=timeout,
             )
         except (OSError, subprocess.SubprocessError):
             continue
@@ -203,7 +217,7 @@ def _default_base_branch() -> str:
     return "main"
 
 
-def _branch_is_integrated(branch: str) -> bool:
+def _branch_is_integrated(branch: str, deadline: float) -> bool:
     """branch が base に統合済み (通常マージ / squash merge) か判定する。
 
     squash merge はコミットが ancestor にも patch-id 一致にもならないため、
@@ -211,15 +225,18 @@ def _branch_is_integrated(branch: str) -> bool:
       1. merge-base --is-ancestor : 通常マージ / fast-forward
       2. git diff --quiet base..branch : squash 直後 (branch 固有差分なし)
       3. gh で merged PR の存在 : main 進行後の squash merge を確実に検出
+    deadline までに統合済みと確認できなければ False (未統合扱い) を返す。
     """
-    base = _default_base_branch()
+    base = _default_base_branch(deadline)
 
     # 1. 通常マージ / fast-forward (branch が base の祖先)
+    if (timeout := _remaining(deadline, 5)) is None:
+        return False
     try:
         result = subprocess.run(
             ["git", "merge-base", "--is-ancestor", branch, base],
             capture_output=True,
-            timeout=5,
+            timeout=timeout,
         )
         if result.returncode == 0:
             return True
@@ -227,11 +244,13 @@ def _branch_is_integrated(branch: str) -> bool:
         pass
 
     # 2. squash merge 直後: branch のツリーが base に対して固有差分を持たない
+    if (timeout := _remaining(deadline, 5)) is None:
+        return False
     try:
         result = subprocess.run(
             ["git", "diff", "--quiet", base, branch],
             capture_output=True,
-            timeout=5,
+            timeout=timeout,
         )
         if result.returncode == 0:
             return True
@@ -239,12 +258,14 @@ def _branch_is_integrated(branch: str) -> bool:
         pass
 
     # 3. merged PR が存在すれば統合済み (squash merge を確実に検出)
+    if (timeout := _remaining(deadline, 10)) is None:
+        return False
     try:
         result = subprocess.run(
             ["gh", "pr", "list", "--head", branch, "--state", "merged", "--json", "number"],
             capture_output=True,
             text=True, encoding="utf-8", errors="replace",
-            timeout=10,
+            timeout=timeout,
         )
         if result.returncode == 0 and result.stdout.strip() not in ("", "[]"):
             return True
@@ -300,15 +321,19 @@ def check_branch_force_delete(command: str) -> str | None:
         # 形が読めない場合は判定せず他ルールに委ねる (誤許可を避ける)
         return None
 
-    unmerged = [b for b in branch_args if not _branch_is_integrated(b)]
+    deadline = time.monotonic() + INTEGRATION_BUDGET_SECONDS
+    unmerged = [b for b in branch_args if not _branch_is_integrated(b, deadline)]
     if not unmerged:
         log_debug(f"ALLOW branch -D (integrated): {branch_args}")
         return None
 
-    log_debug(f"BLOCKING: branch -D on unmerged branch(es): {unmerged}")
+    timed_out = time.monotonic() >= deadline
+    log_debug(f"BLOCKING: branch -D on unmerged branch(es): {unmerged} (timed out: {timed_out})")
     return (
         f"🚫 git branch -D: base へ未統合の可能性があるブランチを強制削除しようとしています: {unmerged}\n"
-        "→ squash merge 済みなら main へ pull 後に再試行 (統合判定が通ります)。\n"
+        + (f"→ 統合判定 (git / gh) が {INTEGRATION_BUDGET_SECONDS:g} 秒以内に終わらなかったため未統合として扱いました。\n"
+           if timed_out else "")
+        + "→ squash merge 済みなら main へ pull 後に再試行 (統合判定が通ります)。\n"
         "→ 本当に破棄してよい場合のみ、ユーザー確認の上で実行してください。"
     )
 

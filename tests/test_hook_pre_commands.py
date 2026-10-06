@@ -152,3 +152,51 @@ def test_branch_delete_mention_in_message_not_blocked(tmp_path):
     result = run_hook('git commit -m "docs: explain git branch -D usage"', tmp_path)
     assert result.returncode == 0
     assert pretooluse_deny_reason(result) is None
+
+
+def _load_hook_module():
+    sys.path.insert(0, str(HOOK.parent))
+    import hook_pre_commands
+    return hook_pre_commands
+
+
+def test_branch_force_delete_denies_when_integration_check_runs_out_of_time(tmp_path, monkeypatch):
+    """gh が応答しなくても登録 timeout 前に判定を打ち切り、未統合として拒否する (fail-open させない)"""
+    import os
+    import time
+    hook = _load_hook_module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git = _init_repo(repo)
+    git("checkout", "-q", "-b", "squashed-elsewhere")
+    (repo / "x.txt").write_text("x\n", encoding="utf-8")
+    git("add", "x.txt")
+    git("commit", "-q", "-m", "x")
+    git("checkout", "-q", "main")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_gh = bin_dir / "gh"
+    fake_gh.write_text("#!/bin/sh\nexec sleep 30\n", encoding="utf-8")
+    fake_gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.chdir(repo)
+    monkeypatch.setattr(hook, "LOG_DIR", tmp_path / "logs")
+    monkeypatch.setattr(hook, "INTEGRATION_BUDGET_SECONDS", 1.0)
+    started = time.monotonic()
+    reason = hook.check_branch_force_delete("git branch -D squashed-elsewhere")
+    assert time.monotonic() - started < 3
+    assert reason and "squashed-elsewhere" in reason
+    assert "以内に終わらなかった" in reason
+
+
+def test_integration_budget_fits_registered_timeouts():
+    """統合判定の予算は、起動と他の git 呼び出しの余裕を残して両クライアントの登録 timeout に収まる"""
+    hook = _load_hook_module()
+    sys.path.insert(0, str(HOOK.parents[2] / "scripts"))
+    from install_harness import CODEX_HOOKS
+    plugin = json.loads((HOOK.parents[1] / "hooks.json").read_text(encoding="utf-8"))
+    claude_timeout = next(handler["timeout"] for group in plugin["hooks"]["PreToolUse"]
+                          for handler in group["hooks"] if "hook_pre_commands.py" in handler["args"])
+    codex_timeout = next(timeout for _, _, script, timeout in CODEX_HOOKS if script == "hook_pre_commands.py")
+    for timeout in (claude_timeout, codex_timeout):
+        assert hook.INTEGRATION_BUDGET_SECONDS + 3 <= timeout

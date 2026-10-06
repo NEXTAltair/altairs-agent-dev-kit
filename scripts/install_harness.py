@@ -60,18 +60,19 @@ def hook_bootstrap(script: str, provider: str = "claude", event: str = "PreToolU
     return f"import base64,zlib; exec(zlib.decompress(base64.b64decode('{encoded}')))"
 
 
-# Codex events and matchers. Codex reports every shell call as "Bash" and file edits as
-# "apply_patch"; it has no WorktreeCreate. Append new groups: trust is keyed by position.
+# Codex events, matchers and timeouts (seconds, same as hooks/hooks.json). Codex reports every
+# shell call as "Bash" and file edits as "apply_patch"; it has no WorktreeCreate. Append new
+# groups: trust is keyed by position.
 CODEX_HOOKS = (
-    ("PreToolUse", "Bash|PowerShell", "hook_pre_commands.py"),
-    ("PreToolUse", "apply_patch", "hook_pre_edit_worktree.py"),
-    ("Stop", None, "hook_response_monitor.py"),
+    ("PreToolUse", "Bash|PowerShell", "hook_pre_commands.py", 15),
+    ("PreToolUse", "apply_patch", "hook_pre_edit_worktree.py", 5),
+    ("Stop", None, "hook_response_monitor.py", 5),
 )
 
 
 def codex_wiring() -> dict:
     events: dict[str, list] = {}
-    for event, matcher, script in CODEX_HOOKS:
+    for event, matcher, script, timeout in CODEX_HOOKS:
         bootstrap = hook_bootstrap(script, provider="codex", event=event)
         group = {
             "hooks": [
@@ -79,7 +80,7 @@ def codex_wiring() -> dict:
                     "type": "command",
                     "command": f'python3 -I -X utf8 -c "{bootstrap}"',
                     "commandWindows": f'python -I -X utf8 -c "{bootstrap}"',
-                    "timeout": 5,
+                    "timeout": timeout,
                 }
             ]
         }

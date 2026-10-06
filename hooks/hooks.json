@@ -15,7 +15,7 @@
               "hook_pre_commands.py",
               "PreToolUse"
             ],
-            "timeout": 5
+            "timeout": 15
           },
           {
             "type": "command",

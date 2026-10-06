@@ -48,6 +48,11 @@ plugin の `${CLAUDE_PLUGIN_ROOT}` / `${user_config.*}`、Codex の `commandWind
    (古いクライアント向けに `MultiEdit` を残す)、Codex には `apply_patch` の group を追加する。
 4. **起動失敗時の `cd` 例外** (ADR-0009) は Codex でも `tool_name` が `Bash` (または旧版の無し) のときだけ適用する。
 5. **整合 lint** は、固定した runtime が `hook_worktree_remove.py` を含む場合だけ `WorktreeRemove` を必須にする。
+6. **timeout による素通りを防ぐ**。hook の timeout・異常終了・不正な JSON は、両クライアントとも tool 呼び出しを止めない
+   (fail-open)。`hook_pre_commands.py` の `git branch -D` 判定は git と `gh` (最大 10 秒) を呼ぶため、登録 timeout (5 秒) で
+   打ち切られると未統合ブランチの削除がそのまま通っていた。判定全体に 10 秒の予算を設け、時間内に統合済みと
+   確認できなければ未統合として拒否する。あわせて `hook_pre_commands.py` の登録 timeout を両クライアントで 15 秒にする。
+   予算が登録 timeout に収まることはテストで固定する。
 
 ## runtime ファイルを足すときの規則
 
@@ -64,6 +69,5 @@ plugin を更新すると、新しい `bootstrap.py` が consumer の古い bran
   `.claude/settings.json` へマージし直し (WorktreeRemove が増える)、Codex は再生成された `.codex/hooks.json` を
   `/hooks` で信頼し直す (起動コードが変わるので全 hook が再レビュー対象。未信頼の間は実行されない)。
 - ADR-0005 の WorktreeCreate payload の記述 (`worktree_name` / `source_ref`) は本 ADR で訂正する。
-- 既知の未対応: hook の timeout・異常終了・不正な JSON は両クライアントとも tool 呼び出しを止めない (fail-open)。
-  `hook_pre_commands.py` の `git branch -D` 判定は内部で最大 10 秒の `gh` 呼び出しを行い、登録 timeout (5 秒) を
-  超え得る。本 ADR では変更しない。
+- hook に処理を足すときは、内部の待ち時間の合計を登録 timeout より短く保つ。超えると、その hook の保護は
+  黙って無効になる (fail-open)。
