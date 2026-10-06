@@ -149,7 +149,13 @@ def main() -> None:
             sys.exit(0)
 
         active_root = find_project_root()
-        repo_root = find_shared_root(active_root)
+        try:
+            repo_root = find_shared_root(active_root, strict=True)
+        except RuntimeError as error:
+            emit_pretooluse_deny(
+                f"🚫 {error}\n→ 編集先が共有 checkout の保護対象か判定できないため、編集を拒否しました。"
+                "git が応答するか確認してから再試行してください。"
+            )
         worktree_root = repo_root / ".agents" / "worktree"
         rules = load_hook_rules("pre_edit_worktree", active_root)
         protected_dirs = rules.get("protected_dirs", DEFAULT_PROTECTED_DIRS)

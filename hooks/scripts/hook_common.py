@@ -78,8 +78,13 @@ def get_log_dir(root: Path) -> Path:
     return root / ".claude" / "logs"
 
 
-def find_shared_root(root: Path) -> Path:
-    """Find the main checkout containing the shared environment from a linked worktree."""
+def find_shared_root(root: Path, strict: bool = False) -> Path:
+    """Find the main checkout containing the shared environment from a linked worktree.
+
+    Git checkout でない root では root 自身を返す。strict=True では、root が Git checkout (`.git` がある)
+    なのに共有 checkout を特定できない場合 (git の失敗・timeout、非対応の配置) に RuntimeError を送出する。
+    共有 checkout を基準に判定する保護 (編集ゲート) が、作業 checkout を代わりに使って素通りしないため。
+    """
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
@@ -91,6 +96,8 @@ def find_shared_root(root: Path) -> Path:
             return common.parent.resolve()
     except (OSError, subprocess.SubprocessError):
         pass
+    if strict and (root / ".git").exists():
+        raise RuntimeError(f"共有 checkout を特定できません: {root}")
     return root.resolve()
 
 

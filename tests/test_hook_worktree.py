@@ -125,3 +125,49 @@ def test_command_of_other_tools_is_not_parsed_as_patch(tmp_path):
     )
     assert result.returncode == 0
     assert pretooluse_deny_reason(result) is None
+
+
+def test_denies_when_shared_checkout_cannot_be_identified_from_a_worktree(tmp_path):
+    # 共有 checkout の特定に失敗したとき作業中の worktree を代わりに使うと、
+    # worktree から共有 checkout の src/ を指す編集が「範囲外」として素通りする。
+    import shutil
+    main = tmp_path / "main"
+    main.mkdir()
+
+    def git(*args, cwd=main):
+        subprocess.run(["git", "-c", "user.name=T", "-c", "user.email=t@e", *args], cwd=cwd,
+                       check=True, capture_output=True)
+
+    git("init", "-q")
+    git("commit", "-q", "--allow-empty", "-m", "init")
+    worktree = main / ".agents" / "worktree" / "wt"
+    git("worktree", "add", "-q", "--detach", str(worktree))
+    (main / "src").mkdir()
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    wrapper = bin_dir / "git"
+    wrapper.write_text(
+        "#!/bin/sh\n"
+        'case " $* " in *" --git-common-dir "*) echo "fatal: simulated failure" >&2; exit 128;; esac\n'
+        f'exec "{shutil.which("git")}" "$@"\n',
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    env = {"CLAUDE_PROJECT_DIR": str(worktree), "PATH": f"{bin_dir}:/usr/bin:/bin"}
+    for payload in (
+        {"tool_name": "apply_patch", "cwd": str(worktree),
+         "tool_input": {"command": patch_of("*** Update File: ../../../src/app.py")}},
+        {"tool_name": "Edit", "tool_input": {"file_path": str(main / "src" / "app.py")}},
+    ):
+        result = subprocess.run(
+            [sys.executable, str(EDIT_HOOK)], input=json.dumps(payload), capture_output=True,
+            text=True, cwd=worktree, timeout=10, env=env,
+        )
+        assert pretooluse_deny_reason(result) is not None, payload["tool_name"]
+    # git が正常なら、worktree 内の編集は従来どおり許可される。
+    result = subprocess.run(
+        [sys.executable, str(EDIT_HOOK)], capture_output=True, text=True, cwd=worktree, timeout=10,
+        input=json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(worktree / "src" / "app.py")}}),
+        env={**env, "PATH": "/usr/bin:/bin"},
+    )
+    assert pretooluse_deny_reason(result) is None
