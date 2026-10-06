@@ -18,9 +18,10 @@ Claude Code が渡す payload:
 - worktree の HEAD が、worktree を消しても残る ref (ブランチ・リモート追跡・タグ等) から到達できること。
   WorktreeCreate は detached HEAD で作るので、ブランチを切らずに commit した worktree を消すと
   その commit はどこからも参照されなくなる。`git worktree remove` はこれを止めない
-- ignore 対象のファイルが、作り直せるキャッシュ (DISPOSABLE_*) と kit の hook ログだけであること。
-  `git worktree remove` は `--force` なしでも ignore 対象のファイル (.env、ローカル DB、実験の出力等) を
-  確認なしで消す
+- 未追跡・変更済みのファイルが無く、ignore 対象のファイルが作り直せるキャッシュ (DISPOSABLE_*) と kit の
+  hook ログだけであること。`git worktree remove` は `--force` なしでも ignore 対象のファイル (.env、ローカル DB、
+  実験の出力等) を確認なしで消し、`status.showUntrackedFiles=no` の repository では未追跡ファイルも見逃す
+- `assume-unchanged` / `skip-worktree` の付いた tracked ファイルが無いこと。これらの変更は Git の確認に出ない
 - `git worktree remove` を `--force` なしで実行する。未コミット・未追跡ファイルを含む
   worktree、lock された worktree、submodule を init 済みの worktree は Git 自身が拒否し、
   そのまま残る (submodule 側の未 push commit を巻き込んで消さないため)。
@@ -125,12 +126,34 @@ def _raise(error: OSError) -> None:
     raise error
 
 
-def _first_kept_ignored(worktree: Path, deadline: float) -> str | None:
-    """削除で失われる ignore 対象のうち、作り直せないものを 1 つ返す (無ければ None)。
+def _first_hidden_index_entry(worktree: Path, deadline: float) -> str | None:
+    """`assume-unchanged` / `skip-worktree` の付いた tracked ファイルを 1 つ返す (無ければ None)。
 
-    ignore 対象のディレクトリは Git がまとめて 1 件で返すので、中を走査して確かめる。
-    作り直せないものが見つかった時点で止めるので、大きなディレクトリでも走査は短い。
-    確かめられないもの (Git の表示と実体が合わない、読めない、走査しない symlink のディレクトリ) も残す側に倒す。
+    これらのファイルの変更は git status にも git worktree remove の確認にも出ない。内容は比べずに
+    残す側に倒す (sparse-checkout の worktree も自動では消さない)。
+    """
+    result = subprocess.run(
+        ["git", "ls-files", "-v", "-z"],
+        cwd=worktree, capture_output=True, text=True, encoding="utf-8", errors="surrogateescape",
+        timeout=_timeout(deadline, STATUS_TIMEOUT),
+    )
+    if result.returncode != 0:
+        return f"(git ls-files に失敗: {result.stderr.strip()[-200:]})"
+    for entry in result.stdout.split("\0"):
+        # 小文字のタグは assume-unchanged、S / s は skip-worktree。
+        if len(entry) > 2 and (entry[0].islower() or entry[0] == "S"):
+            return entry[2:]
+    return None
+
+
+def _first_kept_entry(worktree: Path, deadline: float) -> str | None:
+    """削除で失われるファイルのうち、作り直せないものを 1 つ返す (無ければ None)。
+
+    未追跡・変更済みのファイルは全て残す対象。`--untracked-files=normal` を明示するので、repository の
+    `status.showUntrackedFiles` 設定に左右されない。ignore 対象は作り直せるもの以外を残す対象とし、
+    Git がまとめて 1 件で返すディレクトリは中を走査して確かめる。作り直せないものが見つかった時点で
+    止めるので、大きなディレクトリでも走査は短い。確かめられないもの (Git の表示と実体が合わない、
+    読めない、走査しない symlink のディレクトリ) も残す側に倒す。
     """
     result = subprocess.run(
         ["git", "status", "--porcelain=v1", "-z", "--ignored=matching", "--untracked-files=normal"],
@@ -140,8 +163,11 @@ def _first_kept_ignored(worktree: Path, deadline: float) -> str | None:
     if result.returncode != 0:
         return f"(git status に失敗: {result.stderr.strip()[-200:]})"
     for entry in result.stdout.split("\0"):
-        if not entry.startswith("!! "):
+        if not entry:
             continue
+        if not entry.startswith("!! "):
+            # 未追跡 (??)・変更・ステージ済みの変更。git worktree remove の確認は設定次第で見逃す。
+            return entry[3:] if entry[2:3] == " " else entry
         relative = entry[len("!! "):]
         if _disposable(relative):
             continue
@@ -205,11 +231,11 @@ def main() -> None:
                 "削除するとこの commit を失います。必要ならブランチを作成してから削除してください。"
             )
         if target.exists():
-            kept = _first_kept_ignored(target, deadline)
+            kept = _first_hidden_index_entry(target, deadline) or _first_kept_entry(target, deadline)
             if kept is not None:
                 _fail(
-                    f"{target} に作り直せない ignore 対象のファイルがあるため残します: {kept}\n"
-                    "git worktree remove はこれを確認なしで消します。内容を確認し、不要な場合だけ手動で削除してください。"
+                    f"{target} に削除で失われるファイルがあるため残します: {kept}\n"
+                    "git worktree remove はこれを確認なしで消す場合があります。内容を確認し、不要な場合だけ手動で削除してください。"
                 )
         remove_timeout = remaining_seconds(deadline, REMOVE_TIMEOUT)
         if remove_timeout is None or remove_timeout < MIN_REMOVE_SECONDS:

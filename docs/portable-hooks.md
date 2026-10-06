@@ -34,8 +34,10 @@ deletes only linked worktrees of the same repository directly under
 untracked files, locks, or initialized submodules stay in place, and so do worktrees
 whose HEAD no branch, remote-tracking ref or tag contains (WorktreeCreate starts them
 detached, so commits made before creating a branch would otherwise be lost). Git also
-deletes ignored files without `--force`, so the hook keeps any worktree with ignored
-files other than Python caches and the kit's own hook logs. Hooks bound their work by
+deletes ignored files without `--force`, and misses untracked files when
+`status.showUntrackedFiles=no` or edits hidden by `assume-unchanged` / `skip-worktree`,
+so the hook checks these itself and keeps any worktree with untracked or flagged files,
+or with ignored files other than Python caches and the kit's own hook logs. Hooks bound their work by
 the registered timeout counted from process start (`hook_common.hook_deadline`).
 PreToolUse and Stop are registered with 30-second timeouts in both clients: the launcher
 and the hook may spend up to 20 seconds on Git calls before deciding, and a hook that

@@ -341,3 +341,28 @@ def test_fails_when_worktree_list_fails_even_if_directory_is_gone(tmp_path):
     assert "worktree list" in result.stderr
     listed = subprocess.run(["git", "worktree", "list"], cwd=repo, capture_output=True, text=True)
     assert str(worktree) in listed.stdout
+
+
+def test_keeps_untracked_files_even_when_status_hides_them(tmp_path):
+    # status.showUntrackedFiles=no だと git worktree remove は未追跡ファイルを見逃して消す。
+    init_repo(tmp_path)
+    git(tmp_path, "config", "status.showUntrackedFiles", "no")
+    worktree = create(tmp_path, "hidden-untracked")
+    (worktree / "experiment.out").write_text("result", encoding="utf-8")
+    result = remove(tmp_path, worktree)
+    assert result.returncode != 0
+    assert "experiment.out" in result.stderr
+    assert (worktree / "experiment.out").read_text(encoding="utf-8") == "result"
+
+
+def test_keeps_changes_hidden_by_index_flags(tmp_path):
+    # assume-unchanged / skip-worktree の付いたファイルの変更は Git の確認に出ない。
+    init_repo(tmp_path)
+    for flag in ("--assume-unchanged", "--skip-worktree"):
+        worktree = create(tmp_path, "flag" + flag.replace("-", "_"))
+        git(worktree, "update-index", flag, "README.md")
+        (worktree / "README.md").write_text("local change\n", encoding="utf-8")
+        result = remove(tmp_path, worktree)
+        assert result.returncode != 0, flag
+        assert "README.md" in result.stderr
+        assert (worktree / "README.md").read_text(encoding="utf-8") == "local change\n"

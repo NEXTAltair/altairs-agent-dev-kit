@@ -41,6 +41,9 @@ plugin の `${CLAUDE_PLUGIN_ROOT}` / `${user_config.*}`、Codex の `commandWind
    - worktree の HEAD が、worktree を消しても残る ref (ブランチ・リモート追跡・タグ等) から到達できるときだけ。
      WorktreeCreate は detached HEAD で作るので、ブランチを切らずに commit した worktree は clean でも残す
      (`git worktree remove` はこの commit の消失を止めない)
+   - 未追跡・変更済みのファイルが無いときだけ。`git status --untracked-files=normal` で hook 自身が確かめる
+     (`status.showUntrackedFiles=no` の repository では `git worktree remove` が未追跡ファイルを見逃して消すため)。
+     `assume-unchanged` / `skip-worktree` の付いた tracked ファイルがある worktree も、変更が Git の確認に出ないので残す
    - ignore 対象のファイルが、作り直せる Python のキャッシュ (`__pycache__` / `.pytest_cache` / `.mypy_cache` /
      `.ruff_cache` / `.hypothesis`、`*.pyc` / `*.pyo`、`.coverage*`) と kit の hook ログ (`.claude/logs/` / `.codex/logs/`)
      だけのときだけ。`git worktree remove` は `--force` なしでも ignore 対象 (.env、ローカル DB、実験の出力等) を
