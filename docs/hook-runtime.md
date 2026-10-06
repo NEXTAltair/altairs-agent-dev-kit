@@ -2,7 +2,7 @@
 type: Guide
 title: Hook runtime の固定・復元契約
 description: 作業 checkout の lock と override、共有 runtime、起動・復元失敗の扱い
-timestamp: 2026-09-07
+timestamp: 2026-10-06
 ---
 # Hook runtime の固定・復元契約
 
@@ -25,6 +25,9 @@ override を所有する。固有フックのために `hook_common` や runtime
   rules だけのディレクトリや旧 adapter の存在では runtime と判定しない。
 
 lock は相対パスごとの SHA-256 と、それらをソートした manifest の SHA-256 を保持する。
+起動入口が lock に必ず含まれることを要求するファイル (`bootstrap.REQUIRED`) は凍結する。plugin 更新で
+新しい起動入口が古い branch pin を検証するため、ここを増やすと既存 lock が全て拒否される。
+新しく足すファイルは `bootstrap.OPTIONAL` に置き、それを含まない lock ではそのファイルを使う hook だけが失敗する。
 同じ Git commit の配布ファイルは `.gitattributes` により Windows/Linux とも LF に固定される。
 共有先に別版を追加しても既存ブランチは旧版を使い続ける。lock と起動設定は Git 管理し、
 `.agent-kit/runtimes/`、`.agent-kit/.pin-update` は consumer の gitignore に追加する。
@@ -63,7 +66,9 @@ plugin も事前に `--runtime-only` で lock を作る。plugin 自動更新だ
 
 Claude のプロジェクト登録を移行した後は `scripts/check_config_consistency.py --root <checkout>`
 で確認する。lock がある場合、既定で `PreToolUse` / `Stop` / `WorktreeCreate` の登録欠落・空登録・
-`disableAllHooks` を検出する。個別コマンドの内容が同じかまでは検査しない。
+`disableAllHooks` を検出する。固定した runtime が `hook_worktree_remove.py` を含む場合は `WorktreeRemove` も
+要求する (WorktreeCreate だけを登録すると Claude Code は hook が作った worktree を削除せず残すため)。
+個別コマンドの内容が同じかまでは検査しない。
 一部イベントだけをプロジェクト設定で管理する場合は、consumer の
 `.claude/hooks/rules/consistency.json` の `required_hook_events` にそのイベント名の配列を宣言する。
 この検査は `.claude/settings.json` が対象で、Codex 設定や plugin/ユーザー設定からの自動登録は
@@ -86,19 +91,22 @@ installer が動いていないことを確認して空のディレクトリを�
 
 ## 失敗の契約
 
-runtime 欠損・版不一致・不正 lock・Git root 検出失敗は stderr に `agent-kit runtime unavailable`
+runtime 欠損・版不一致・不正 lock・Git root 検出失敗 (起動入口の git 呼び出しが合計 15 秒の
+`STARTUP_BUDGET` を超えた場合を含む) は stderr に `agent-kit runtime unavailable`
 と復元案内を出す。PreToolUse は stdout の `hookSpecificOutput.permissionDecision=deny`、
 Stop は `decision=block` (ともに exit 0 の構造化拒否) を返す。
 Stop の再入 (`stop_hook_active: true`) は stderr に診断を残して exit 0 で終了し、
 再び停止を拒否して無限ループすることを防ぐ。
 PreToolUse の例外は引数なし・単一パス引数の `cd` だけで、stdout を空にして通常の permission flow へ渡す。
 Bash は builtin の `cd` のみ、PowerShell は `cd` / `Set-Location` を大文字小文字を区別せずに認める
-(それ以外の名前は任意の実行ファイルや関数に解決し得る)。Codex の payload は `tool_name` を持たず
-`tool_input.cmd` に command を載せるため、provider が codex のときは host の shell
-(Windows なら PowerShell、それ以外は Bash) の規則で判定する。連結 (`&&` `;` `|`)・置換 (`$(...)` バッククオート)
+(それ以外の名前は任意の実行ファイルや関数に解決し得る)。Codex は全ての shell 呼び出しを `tool_name: "Bash"`
+(旧版は `tool_name` 無しで `tool_input.cmd`) で送るが実際は host の shell で実行するため、provider が codex のときは
+host の shell (Windows なら PowerShell、それ以外は Bash) の規則で判定する。`apply_patch` などそれ以外の tool は対象外。連結 (`&&` `;` `|`)・置換 (`$(...)` バッククオート)
 を含むものは deny のまま。この例外は policy が判定すべき処理を一切実行せず、cwd が入れ子 repository に
 入ったことによる失敗からエージェント自身が脱出する唯一の手段であるために設ける。
-WorktreeCreate / TeammateIdle などは exit 2 で失敗する。正常な検査成功として扱わない。
+WorktreeCreate / WorktreeRemove / TeammateIdle などは exit 2 で失敗する。正常な検査成功として扱わない。
+WorktreeRemove が失敗すると Claude Code は worktree を残す。lock に含まれない hook (古い pin に対する新しい
+plugin の WorktreeRemove 等) も `hook is not part of the pinned runtime` として同じく失敗する。
 固有 hook 本体の出力契約は consumer の責務。
 
 Windows/Linux の CI は `test_portable_install.py` と `test_hook_portability.py` を実行する。

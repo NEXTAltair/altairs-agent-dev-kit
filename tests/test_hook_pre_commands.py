@@ -152,3 +152,53 @@ def test_branch_delete_mention_in_message_not_blocked(tmp_path):
     result = run_hook('git commit -m "docs: explain git branch -D usage"', tmp_path)
     assert result.returncode == 0
     assert pretooluse_deny_reason(result) is None
+
+
+def _load_hook_module():
+    sys.path.insert(0, str(HOOK.parent))
+    import hook_pre_commands
+    return hook_pre_commands
+
+
+def test_branch_force_delete_denies_when_integration_check_runs_out_of_time(tmp_path, monkeypatch):
+    """起動処理で時間を使い、gh も応答しなくても、登録 timeout 前に判定を打ち切って拒否する (fail-open させない)"""
+    import os
+    import time
+    hook = _load_hook_module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git = _init_repo(repo)
+    git("checkout", "-q", "-b", "squashed-elsewhere")
+    (repo / "x.txt").write_text("x\n", encoding="utf-8")
+    git("add", "x.txt")
+    git("commit", "-q", "-m", "x")
+    git("checkout", "-q", "main")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_gh = bin_dir / "gh"
+    fake_gh.write_text("#!/bin/sh\nexec sleep 30\n", encoding="utf-8")
+    fake_gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.chdir(repo)
+    monkeypatch.setattr(hook, "LOG_DIR", tmp_path / "logs")
+    # 起動入口の git 呼び出しなどで、締め切りまで残り 1 秒になったところから判定が始まる。
+    spent = hook.REGISTERED_TIMEOUT_SECONDS - hook.TIMEOUT_MARGIN_SECONDS - 1
+    monkeypatch.setenv("AGENT_KIT_STARTED", repr(time.monotonic() - spent))
+    started = time.monotonic()
+    reason = hook.check_branch_force_delete("git branch -D squashed-elsewhere")
+    assert time.monotonic() - started < 3
+    assert reason and "squashed-elsewhere" in reason
+    assert "制限時間" in reason
+
+
+def test_registered_timeout_matches_both_clients():
+    """hook が想定する登録 timeout は、Claude と Codex の実際の登録値と一致する"""
+    hook = _load_hook_module()
+    sys.path.insert(0, str(HOOK.parents[2] / "scripts"))
+    from install_harness import CODEX_HOOKS
+    plugin = json.loads((HOOK.parents[1] / "hooks.json").read_text(encoding="utf-8"))
+    claude_timeout = next(handler["timeout"] for group in plugin["hooks"]["PreToolUse"]
+                          for handler in group["hooks"] if "hook_pre_commands.py" in handler["args"])
+    codex_timeout = next(timeout for _, _, script, timeout in CODEX_HOOKS if script == "hook_pre_commands.py")
+    assert claude_timeout == codex_timeout == hook.REGISTERED_TIMEOUT_SECONDS
+    assert 0 < hook.TIMEOUT_MARGIN_SECONDS < hook.REGISTERED_TIMEOUT_SECONDS

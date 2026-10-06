@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -30,6 +31,31 @@ def _default_rules_dir() -> Path:
 
 
 DEFAULT_RULES_DIR = _default_rules_dir()
+_IMPORTED_AT = time.monotonic()
+
+
+def hook_deadline(registered_timeout: float, margin: float) -> float:
+    """hook が登録 timeout 内に応答を返すための締め切り (time.monotonic 基準)。
+
+    両クライアントとも timeout で打ち切った hook の判定を使わずに処理を続ける (PreToolUse なら tool を
+    実行する)。起動入口 (hooks/bootstrap.py) が記録したプロセス起動時刻 AGENT_KIT_STARTED から数えるので、
+    起動入口の git 呼び出しの時間も含まれる。記録が無い・不正な場合 (直接起動、起動コードが古い登録) は
+    この module の読み込み時刻から数える。margin は Python の起動と応答の出力のための余裕。
+    """
+    started = _IMPORTED_AT
+    try:
+        recorded = float(os.environ["AGENT_KIT_STARTED"])
+    except (KeyError, ValueError):
+        recorded = None
+    if recorded is not None and 0 <= time.monotonic() - recorded <= registered_timeout:
+        started = recorded
+    return started + registered_timeout - margin
+
+
+def remaining_seconds(deadline: float, cap: float) -> float | None:
+    """deadline までの残り秒数を cap 以下で返す。使い切っていれば None。"""
+    remaining = deadline - time.monotonic()
+    return min(cap, remaining) if remaining > 0 else None
 
 
 def find_project_root() -> Path:
@@ -52,8 +78,13 @@ def get_log_dir(root: Path) -> Path:
     return root / ".claude" / "logs"
 
 
-def find_shared_root(root: Path) -> Path:
-    """Find the main checkout containing the shared environment from a linked worktree."""
+def find_shared_root(root: Path, strict: bool = False) -> Path:
+    """Find the main checkout containing the shared environment from a linked worktree.
+
+    Git checkout でない root では root 自身を返す。strict=True では、root が Git checkout (`.git` がある)
+    なのに共有 checkout を特定できない場合 (git の失敗・timeout、非対応の配置) に RuntimeError を送出する。
+    共有 checkout を基準に判定する保護 (編集ゲート) が、作業 checkout を代わりに使って素通りしないため。
+    """
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
@@ -65,6 +96,8 @@ def find_shared_root(root: Path) -> Path:
             return common.parent.resolve()
     except (OSError, subprocess.SubprocessError):
         pass
+    if strict and (root / ".git").exists():
+        raise RuntimeError(f"共有 checkout を特定できません: {root}")
     return root.resolve()
 
 

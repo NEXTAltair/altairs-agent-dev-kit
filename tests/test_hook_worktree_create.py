@@ -33,7 +33,7 @@ def run_hook(payload: dict, cwd: Path) -> subprocess.CompletedProcess:
 def test_creates_worktree_and_echoes_path(tmp_path):
     init_repo(tmp_path)
     result = run_hook(
-        {"cwd": str(tmp_path), "worktree_name": "issue-42", "source_ref": "HEAD",
+        {"cwd": str(tmp_path), "name": "issue-42",
          "hook_event_name": "WorktreeCreate", "session_id": "s"},
         tmp_path,
     )
@@ -46,7 +46,7 @@ def test_creates_worktree_and_echoes_path(tmp_path):
 
 def test_reuses_existing_worktree(tmp_path):
     init_repo(tmp_path)
-    payload = {"cwd": str(tmp_path), "worktree_name": "reuse-me",
+    payload = {"cwd": str(tmp_path), "name": "reuse-me",
                "hook_event_name": "WorktreeCreate", "session_id": "s"}
     first = run_hook(payload, tmp_path)
     second = run_hook(payload, tmp_path)
@@ -54,10 +54,11 @@ def test_reuses_existing_worktree(tmp_path):
     assert first.stdout.strip() == second.stdout.strip()
 
 
-def test_legacy_name_field_fallback(tmp_path):
+def test_legacy_worktree_name_field_fallback(tmp_path):
     init_repo(tmp_path)
     result = run_hook(
-        {"cwd": str(tmp_path), "name": "old-shape", "hook_event_name": "WorktreeCreate"},
+        {"cwd": str(tmp_path), "worktree_name": "old-shape", "source_ref": "HEAD",
+         "hook_event_name": "WorktreeCreate"},
         tmp_path,
     )
     assert result.returncode == 0, result.stderr
@@ -67,7 +68,7 @@ def test_legacy_name_field_fallback(tmp_path):
 def test_name_is_sanitized(tmp_path):
     init_repo(tmp_path)
     result = run_hook(
-        {"cwd": str(tmp_path), "worktree_name": "feat/x y", "hook_event_name": "WorktreeCreate"},
+        {"cwd": str(tmp_path), "name": "feat/x y", "hook_event_name": "WorktreeCreate"},
         tmp_path,
     )
     assert result.returncode == 0, result.stderr
@@ -76,7 +77,7 @@ def test_name_is_sanitized(tmp_path):
 
 def test_non_git_dir_fails_nonzero(tmp_path):
     result = run_hook(
-        {"cwd": str(tmp_path), "worktree_name": "nope", "hook_event_name": "WorktreeCreate"},
+        {"cwd": str(tmp_path), "name": "nope", "hook_event_name": "WorktreeCreate"},
         tmp_path,
     )
     assert result.returncode != 0

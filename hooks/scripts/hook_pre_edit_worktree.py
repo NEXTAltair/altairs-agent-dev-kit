@@ -3,7 +3,13 @@
 Claude Code Hooks - Pre-Edit Worktree Gate (PreToolUse Hook)
 
 プロジェクト本体のアプリコード (デフォルト `src/`, `tests/`) を共有 checkout
-(project root) で直接 Edit/Write しようとしたらブロックする。
+(project root) で直接編集しようとしたらブロックする。
+
+対象ツールと編集先パスの取り出し方:
+- Claude Code: Edit / Write / MultiEdit は `tool_input.file_path`、NotebookEdit は `tool_input.notebook_path`
+- Codex: `tool_name: "apply_patch"` の `tool_input.command` (パッチ本文) にある
+  `*** Add File:` / `*** Update File:` / `*** Delete File:` / `*** Move to:` 行。
+  相対パスは payload の `cwd` (Codex の作業ディレクトリ) を基準に解決する。
 
 目的:
 - ISSUE 解決・機能開発は「worktree 作成 → そこで実装」を機械的に強制する。
@@ -41,6 +47,47 @@ from hook_common import (
 )
 
 DEFAULT_PROTECTED_DIRS = ["src", "tests"]
+
+PATCH_FILE_HEADERS = ("*** Add File: ", "*** Delete File: ", "*** Update File: ")
+PATCH_MOVE_TO = "*** Move to: "
+
+
+def _patch_paths(patch: str) -> list[str]:
+    """Codex apply_patch の編集先パスを、Codex のパーサと同じ規則で列挙する。
+
+    見出しは行の前後空白を除いて判定するが、Update File の hunk 内では末尾空白だけを除く。
+    hunk 内で行頭が空白の行は context 行なので、見出しと同じ文字列でもパスとみなさない。
+    """
+    paths = []
+    in_update = False
+    for raw in patch.split("\n"):
+        line = raw.rstrip() if in_update else raw.strip()
+        marker = next((m for m in PATCH_FILE_HEADERS if line.startswith(m)), None)
+        if marker:
+            paths.append(line[len(marker):].strip())
+            in_update = marker == "*** Update File: "
+        elif in_update and line.startswith(PATCH_MOVE_TO):
+            paths.append(line[len(PATCH_MOVE_TO):].strip())
+        elif line == "*** End Patch":
+            in_update = False
+    return [path for path in paths if path]
+
+
+def _target_paths(input_data: dict) -> list[str]:
+    """tool 呼び出しが編集するファイルパスを列挙する (読めなければ空)。"""
+    tool_input = input_data.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return []
+    # Edit / Write / MultiEdit は file_path、NotebookEdit は notebook_path を使う。
+    path = tool_input.get("file_path") or tool_input.get("notebook_path")
+    if isinstance(path, str) and path:
+        return [path]
+    patch = tool_input.get("command")
+    if input_data.get("tool_name") != "apply_patch" or not isinstance(patch, str):
+        return []
+    cwd = input_data.get("cwd")
+    base = Path(cwd) if isinstance(cwd, str) and cwd else Path.cwd()
+    return [str(base / name) for name in _patch_paths(patch)]
 
 
 def _resolve(file_path: str) -> Path | None:
@@ -94,20 +141,28 @@ def main() -> None:
         if os.environ.get("ALLOW_MAIN_EDIT") == "1":
             sys.exit(0)
 
-        input_data: dict = json.load(sys.stdin)
-        tool_input = input_data.get("tool_input", {})
-        file_path = tool_input.get("file_path", "")
-        if not file_path:
+        input_data = json.load(sys.stdin)
+        if not isinstance(input_data, dict):
+            sys.exit(0)
+        file_paths = _target_paths(input_data)
+        if not file_paths:
             sys.exit(0)
 
         active_root = find_project_root()
-        repo_root = find_shared_root(active_root)
+        try:
+            repo_root = find_shared_root(active_root, strict=True)
+        except RuntimeError as error:
+            emit_pretooluse_deny(
+                f"🚫 {error}\n→ 編集先が共有 checkout の保護対象か判定できないため、編集を拒否しました。"
+                "git が応答するか確認してから再試行してください。"
+            )
         worktree_root = repo_root / ".agents" / "worktree"
         rules = load_hook_rules("pre_edit_worktree", active_root)
         protected_dirs = rules.get("protected_dirs", DEFAULT_PROTECTED_DIRS)
 
-        if _is_blocked(file_path, repo_root, worktree_root, protected_dirs):
-            emit_pretooluse_deny(_build_message(file_path, repo_root, worktree_root))
+        for file_path in file_paths:
+            if _is_blocked(file_path, repo_root, worktree_root, protected_dirs):
+                emit_pretooluse_deny(_build_message(file_path, repo_root, worktree_root))
 
         sys.exit(0)
 

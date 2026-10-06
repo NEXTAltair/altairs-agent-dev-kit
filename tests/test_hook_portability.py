@@ -52,10 +52,23 @@ def test_worktree_provider_uses_shared_root_from_nested_worktree(tmp_path):
     child = root / ".agents/worktree/first"
     git(root, "worktree", "add", "--detach", str(child))
     git(child, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "child change")
-    result = run_hook("hook_worktree_create", {"cwd": str(child), "worktree_name": "second"}, child)
+    result = run_hook("hook_worktree_create", {"cwd": str(child), "name": "second"}, child)
     assert result.returncode == 0, result.stderr
     assert Path(result.stdout.strip()) == root / ".agents/worktree/second"
     assert git(Path(result.stdout.strip()), "rev-parse", "HEAD").stdout == git(child, "rev-parse", "HEAD").stdout
+
+
+def test_worktree_remove_from_inside_the_target(tmp_path):
+    # Windows はプロセスの cwd にあるディレクトリを削除できない。Claude Code が削除対象の
+    # worktree を cwd として hook を起動しても、hook 自身が抜けてから削除する。
+    root = tmp_path / "日本語 repo"
+    init_repo(root)
+    created = run_hook("hook_worktree_create", {"cwd": str(root), "name": "leaving"}, root)
+    assert created.returncode == 0, created.stderr
+    worktree = Path(created.stdout.strip())
+    result = run_hook("hook_worktree_remove", {"worktree_path": str(worktree)}, worktree)
+    assert result.returncode == 0, result.stderr
+    assert not worktree.exists()
 
 
 def test_project_override_and_provider_log_directory(tmp_path, monkeypatch):

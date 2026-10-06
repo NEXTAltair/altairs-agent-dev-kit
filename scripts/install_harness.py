@@ -13,7 +13,7 @@ from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(KIT / "hooks"))
-from bootstrap import LOCK, REQUIRED, git_root, validate
+from bootstrap import LOCK, OPTIONAL, REQUIRED, git_root, validate
 
 
 def copy_file(source: Path, destination: Path, force: bool) -> None:
@@ -60,28 +60,39 @@ def hook_bootstrap(script: str, provider: str = "claude", event: str = "PreToolU
     return f"import base64,zlib; exec(zlib.decompress(base64.b64decode('{encoded}')))"
 
 
+# Codex events, matchers and timeouts (seconds, same as hooks/hooks.json). Codex reports every
+# shell call as "Bash" and file edits as "apply_patch"; it has no WorktreeCreate. Append new
+# groups: trust is keyed by position. Both clients ignore a hook that times out, so each timeout
+# must cover the launcher's worst-case Git calls before the hook can decide (see bootstrap.py).
+CODEX_HOOKS = (
+    ("PreToolUse", "Bash|PowerShell", "hook_pre_commands.py", 30),
+    ("PreToolUse", "apply_patch", "hook_pre_edit_worktree.py", 30),
+    ("Stop", None, "hook_response_monitor.py", 30),
+)
+
+
 def codex_wiring() -> dict:
-    events = {}
-    for event, script in (("PreToolUse", "hook_pre_commands"), ("Stop", "hook_response_monitor")):
-        bootstrap = hook_bootstrap(f"{script}.py", provider="codex", event=event)
+    events: dict[str, list] = {}
+    for event, matcher, script, timeout in CODEX_HOOKS:
+        bootstrap = hook_bootstrap(script, provider="codex", event=event)
         group = {
             "hooks": [
                 {
                     "type": "command",
                     "command": f'python3 -I -X utf8 -c "{bootstrap}"',
                     "commandWindows": f'python -I -X utf8 -c "{bootstrap}"',
-                    "timeout": 5,
+                    "timeout": timeout,
                 }
             ]
         }
-        if event == "PreToolUse":
-            group["matcher"] = "Bash|PowerShell"
-        events[event] = [group]
+        if matcher:
+            group["matcher"] = matcher
+        events.setdefault(event, []).append(group)
     return {"hooks": events}
 
 
 def runtime_lock() -> dict:
-    paths = sorted(REQUIRED | {"hooks/bootstrap.py"})
+    paths = sorted(REQUIRED | OPTIONAL | {"hooks/bootstrap.py"})
     files = {name: hashlib.sha256((KIT / name).read_bytes()).hexdigest() for name in paths}
     digest = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return {"schema": 1, "runtime": digest, "files": files}
