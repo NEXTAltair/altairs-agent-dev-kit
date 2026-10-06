@@ -15,6 +15,9 @@ Claude Code が渡す payload:
 安全側の制約 (どれか 1 つでも満たさなければ削除せず失敗を返す):
 - WorktreeCreate hook の配置先 (共有 checkout の `.agents/worktree/` 直下) にあること
 - hook を起動した checkout と同じ repository に登録された linked worktree であること
+- worktree の HEAD が、worktree を消しても残る ref (ブランチ・リモート追跡・タグ等) から到達できること。
+  WorktreeCreate は detached HEAD で作るので、ブランチを切らずに commit した worktree を消すと
+  その commit はどこからも参照されなくなる。`git worktree remove` はこれを止めない
 - `git worktree remove` を `--force` なしで実行する。未コミット・未追跡ファイルを含む
   worktree、lock された worktree、submodule を init 済みの worktree は Git 自身が拒否し、
   そのまま残る (submodule 側の未 push commit を巻き込んで消さないため)。
@@ -33,7 +36,8 @@ from hook_common import find_project_root, find_shared_root
 WORKTREE_SUBDIR = ".agents/worktree"
 # 内部の git 呼び出しの合計を登録 timeout (hooks.json の 60 秒) より短く保ち、途中で kill されないようにする。
 LIST_TIMEOUT = 10
-REMOVE_TIMEOUT = 40
+CONTAINS_TIMEOUT = 10
+REMOVE_TIMEOUT = 30
 
 
 def _fail(message: str) -> None:
@@ -41,19 +45,38 @@ def _fail(message: str) -> None:
     sys.exit(1)
 
 
-def _registered_worktrees(shared_root: Path) -> set[Path]:
+def _registered_worktrees(shared_root: Path) -> dict[Path, str | None]:
+    """登録された worktree のパスと HEAD のコミット。ディレクトリが消えた登録も含む。"""
     result = subprocess.run(
         ["git", "worktree", "list", "--porcelain"],
         cwd=shared_root, capture_output=True, text=True, encoding="utf-8", errors="replace",
         timeout=LIST_TIMEOUT,
     )
     if result.returncode != 0:
-        return set()
-    return {
-        Path(line[len("worktree "):]).resolve()
-        for line in result.stdout.splitlines()
-        if line.startswith("worktree ")
-    }
+        return {}
+    worktrees: dict[Path, str | None] = {}
+    current = None
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            current = Path(line[len("worktree "):]).resolve()
+            worktrees[current] = None
+        elif line.startswith("HEAD ") and current is not None:
+            worktrees[current] = line[len("HEAD "):].strip()
+    return worktrees
+
+
+def _kept_by_refs(shared_root: Path, commit: str) -> bool:
+    """commit が、worktree を消しても残る ref から到達できるか。
+
+    共有 checkout から見た ref (refs/heads, refs/remotes, refs/tags 等) だけを数える。
+    削除対象の worktree 専用の ref と HEAD は worktree と一緒に消える。
+    """
+    result = subprocess.run(
+        ["git", "for-each-ref", "--count=1", "--format=%(refname)", "--contains", commit],
+        cwd=shared_root, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=CONTAINS_TIMEOUT,
+    )
+    return result.returncode == 0 and bool(result.stdout.strip())
 
 
 def main() -> None:
@@ -81,12 +104,18 @@ def main() -> None:
         _fail(f"{target} は {worktree_base} 直下ではないため削除しません")
 
     try:
-        registered = target in _registered_worktrees(shared_root)
-        if not registered:
+        registered = _registered_worktrees(shared_root)
+        if target not in registered:
             if not target.exists():
                 print(f"already removed: {target}", file=sys.stderr)
                 sys.exit(0)
             _fail(f"{target} はこの repository の linked worktree として登録されていません")
+        head = registered[target]
+        if not head or not _kept_by_refs(shared_root, head):
+            _fail(
+                f"{target} の HEAD ({head}) はどのブランチ・タグからも到達できないため残します。"
+                "削除するとこの commit を失います。必要ならブランチを作成してから削除してください。"
+            )
         # Windows はプロセスの cwd にあるディレクトリを削除できない。hook 自身が削除対象の中で
         # 起動されていても消せるよう、先に共有 checkout へ移る。ディレクトリが既に無い登録は
         # git worktree remove が登録だけを消す (残すと同名の WorktreeCreate が失敗する)。
@@ -97,7 +126,7 @@ def main() -> None:
             timeout=REMOVE_TIMEOUT,
         )
     except (OSError, subprocess.SubprocessError) as e:
-        _fail(f"git worktree remove 実行失敗: {e}")
+        _fail(f"git の実行に失敗したため残します: {e}")
 
     if result.returncode != 0:
         _fail(

@@ -31,7 +31,9 @@ Claude Code registers WorktreeCreate together with WorktreeRemove. With only
 WorktreeCreate, Claude Code keeps every worktree the hook created. The remove hook
 deletes only linked worktrees of the same repository directly under
 `.agents/worktree/`, and never passes `--force`: worktrees with uncommitted or
-untracked files, locks, or initialized submodules stay in place. The edit gate also
+untracked files, locks, or initialized submodules stay in place, and so do worktrees
+whose HEAD no branch, remote-tracking ref or tag contains (WorktreeCreate starts them
+detached, so commits made before creating a branch would otherwise be lost). The edit gate also
 covers `NotebookEdit`, which passes `tool_input.notebook_path`.
 
 Codex hooks are enabled by default (feature key `hooks`; `codex_hooks` is a

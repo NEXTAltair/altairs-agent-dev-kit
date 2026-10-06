@@ -76,6 +76,42 @@ def test_clears_registration_of_already_deleted_directory(tmp_path):
     assert create(tmp_path, "deleted-by-hand") == worktree
 
 
+def test_keeps_detached_commits_until_a_ref_holds_them(tmp_path):
+    # WorktreeCreate は detached HEAD で作る。ブランチを切らずに commit した worktree は clean でも、
+    # 消すとその commit はどこからも参照されなくなるので残す。
+    init_repo(tmp_path)
+    worktree = create(tmp_path, "detached-work")
+    (worktree / "feature.txt").write_text("work\n", encoding="utf-8")
+    git(worktree, "add", "feature.txt")
+    git(worktree, "commit", "-q", "-m", "work on detached HEAD")
+    result = remove(tmp_path, worktree)
+    assert result.returncode != 0
+    assert "到達できない" in result.stderr
+    assert (worktree / "feature.txt").exists()
+    # ブランチで commit を保持すれば削除でき、commit はブランチに残る。
+    git(worktree, "branch", "keep-work")
+    result = remove(tmp_path, worktree)
+    assert result.returncode == 0, result.stderr
+    assert not worktree.exists()
+    shown = subprocess.run(["git", "show", "keep-work:feature.txt"], cwd=tmp_path, capture_output=True, text=True)
+    assert shown.stdout == "work\n"
+
+
+def test_keeps_registration_of_deleted_directory_holding_detached_commits(tmp_path):
+    # ディレクトリが消えていても、登録の HEAD だけが commit を参照している間は登録を消さない。
+    import shutil
+    init_repo(tmp_path)
+    worktree = create(tmp_path, "deleted-with-work")
+    (worktree / "feature.txt").write_text("work\n", encoding="utf-8")
+    git(worktree, "add", "feature.txt")
+    git(worktree, "commit", "-q", "-m", "work on detached HEAD")
+    shutil.rmtree(worktree)
+    result = remove(tmp_path, worktree)
+    assert result.returncode != 0
+    listed = subprocess.run(["git", "worktree", "list"], cwd=tmp_path, capture_output=True, text=True)
+    assert str(worktree) in listed.stdout
+
+
 def test_keeps_worktree_with_uncommitted_or_untracked_files(tmp_path):
     init_repo(tmp_path)
     worktree = create(tmp_path, "dirty")

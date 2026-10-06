@@ -38,6 +38,9 @@ plugin の `${CLAUDE_PLUGIN_ROOT}` / `${user_config.*}`、Codex の `commandWind
 2. **WorktreeRemove** (`hook_worktree_remove.py`) を Claude の登録 (plugin・インストール型の両方) に追加する。
    削除は安全側に限定する:
    - `<共有 checkout>/.agents/worktree/` の直下で、同じ repository に登録された linked worktree だけ
+   - worktree の HEAD が、worktree を消しても残る ref (ブランチ・リモート追跡・タグ等) から到達できるときだけ。
+     WorktreeCreate は detached HEAD で作るので、ブランチを切らずに commit した worktree は clean でも残す
+     (`git worktree remove` はこの commit の消失を止めない)
    - hook 自身の cwd を共有 checkout へ移してから (Windows は cwd にあるディレクトリを削除できない)、
      `git worktree remove` を `--force` なしで実行する。ディレクトリが既に無い登録は Git が登録だけを消す。未コミット・未追跡ファイル、lock、init 済み submodule
      (WorktreeCreate が init する) を含む worktree は Git が拒否し、hook は非ゼロで終わって worktree は残る。
