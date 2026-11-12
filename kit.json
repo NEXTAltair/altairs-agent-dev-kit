@@ -20,6 +20,14 @@
       "profile": "core",
       "scope": "global"
     },
+    "issue-create": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "issue-to-merge": {
+      "profile": "core",
+      "scope": "global"
+    },
     "okf-bundle": {
       "profile": "core",
       "scope": "global"
@@ -46,7 +54,7 @@
     },
     "worktree-workflow": {
       "profile": "core",
-      "scope": "project"
+      "scope": "global"
     },
     "interface-design": {
       "profile": "qt",
@@ -86,9 +94,9 @@
     },
     "git-workflow": {
       "profile": "core",
-      "scope": "project",
+      "scope": "global",
       "activation": "always",
-      "description": "Issue 解決・機能開発のブランチ戦略と .agents/worktree/ での作業"
+      "description": "Issue 解決・機能開発のブランチ戦略、.agents/worktree/ での作業、PR から merge までの完了の定義 (言語非依存)"
     },
     "planning-memory": {
       "profile": "core",

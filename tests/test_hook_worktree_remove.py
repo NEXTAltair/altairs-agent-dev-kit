@@ -264,6 +264,35 @@ def test_removes_worktree_whose_ignored_files_are_only_caches_and_kit_logs(tmp_p
     assert not worktree.exists()
 
 
+def test_removes_worktree_whose_ignored_files_are_node_dependencies_and_build_caches(tmp_path):
+    # Node.js の worktree は worktree ごとに install するので、merge 後は必ず node_modules が残る。
+    # lockfile から作り直せるものなので、これだけを理由に worktree を残さない。
+    init_repo_ignoring(tmp_path, "node_modules/\n*.tsbuildinfo\n.eslintcache\n")
+    worktree = create(tmp_path, "node-deps")
+    for name in ("node_modules/.pnpm/pkg@1.0.0/node_modules/pkg/index.js", "node_modules/.bin/tool",
+                 "packages/app/node_modules/dep/index.js", "tsconfig.tsbuildinfo", ".eslintcache"):
+        file = worktree / name
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text("x", encoding="utf-8")
+    (worktree / "node_modules/pkg").symlink_to(".pnpm/pkg@1.0.0/node_modules/pkg")  # pnpm の配置
+    result = remove(tmp_path, worktree)
+    assert result.returncode == 0, result.stderr
+    assert not worktree.exists()
+
+
+def test_keeps_worktree_with_ignored_build_output_next_to_node_dependencies(tmp_path):
+    # dist/ のような生成物は、作り直せるとは限らないので消さない。
+    init_repo_ignoring(tmp_path, "node_modules/\ndist/\n")
+    worktree = create(tmp_path, "node-dist")
+    for name in ("node_modules/dep/index.js", "dist/bundle.js"):
+        file = worktree / name
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text("x", encoding="utf-8")
+    result = remove(tmp_path, worktree)
+    assert result.returncode != 0
+    assert (worktree / "dist/bundle.js").is_file()
+
+
 def test_does_not_start_removal_without_time_to_finish(tmp_path):
     # 起動入口の記録から締め切りが近いと分かれば、途中で打ち切られる削除を始めない。
     import time

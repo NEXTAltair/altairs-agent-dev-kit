@@ -11,6 +11,7 @@
 * [ADR-0009: submodule の中にいても hook を動かし、動かせない場所からは cd で戻れるようにする](decisions/0009-submodule-cwd-and-bare-cd-escape.md) — submodule に cd しただけで全ツールが拒否され、戻る cd まで拒否されて詰む問題への対処。submodule は親 checkout の一部として扱い、hook が起動できない場所でも「引数 1 つの cd」だけは通す
 * [ADR-0010: Claude Code 2.1.290 / Codex 0.160.1 の hook 契約に追従する](decisions/0010-hook-contracts-2026-10.md) — WorktreeCreate の payload 名、WorktreeRemove の追加、NotebookEdit と Codex apply_patch の編集ゲート漏れを、実バイナリ・ソース・公式ドキュメントで確認して修正し、古い branch pin を壊さない runtime ファイル追加の規則を定めた
 * [ADR-0011: 4 ハーネス対応の導入 CLI と global / project の分類を持つ](decisions/0011-multi-harness-framework.md) — Claude Code / Codex に加えて Antigravity と OpenClaw へ導入できる agent_kit.py を追加し、部品を kit.json で profile と推奨 scope に分類する。OpenClaw 固有の定義は kit に持たない
+* [ADR-0012: Issue から merge までの流れを言語非依存の core にし、global に置く](decisions/0012-language-agnostic-delivery-flow.md) — Issue 起票・完了条件・worktree・PR レビュー対応・自動 merge の skills と git-workflow rule から Python/uv と特定ハーネスの前提を外し、通しの手順と起票の skill を足して global に分類した
 * [altairs-agent-dev-kit 設計書](superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — LoRAIro の開発標準を汎用化し独立リポジトリとして配布するための設計方針
 * [altairs-agent-dev-kit Implementation Plan](superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — skills / rules / hooks / agents / Codex 設定を汎用化し3経路で導入できる kit を構築する実装計画
 * [docs-freshness-audit skill 設計](superpowers/specs/2026-07-05-docs-freshness-audit-skill-design.md)

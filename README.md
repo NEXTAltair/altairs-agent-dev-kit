@@ -10,7 +10,10 @@ Claude Code 以外の 3 つが直接読む `.agents/skills/` を共通の土台�
 OpenClaw 専用の skill / hook / plugin は OpenClaw 自身の SDK で定義するもので、kit には含めない。
 
 部品は `kit.json` で **profile** (core / python / typescript / qt / sql) と **推奨 scope** (global / project) に
-分類してある。core は言語・スタックに依存しない。python / qt / sql は Python + uv、PySide6/Qt、SQLAlchemy を前提にする
+分類してある。core は言語・スタックに依存しない。Issue の起票から merge までの流れ (`issue-create` → `goal-prompt-crafter` →
+`worktree-workflow` → `pr-maintainer` / `pr-autoloop`、通しの手順は `issue-to-merge`、方針は git-workflow rule) は
+core かつ global で、どの言語のどの repository でも同じ手順で使える。スタックに依存するのは
+「プロジェクトの検査コマンド」だけで、その探し方も `issue-to-merge` が持つ。python / qt / sql は Python + uv、PySide6/Qt、SQLAlchemy を前提にする
 (共有 venv 運用・`uv run` 前提の hook / rules を含む)。typescript は TypeScript / JavaScript 向けの rules 3 本
 (型チェックと lint の設定、テスト、依存の導入) で、専用の skills / agents はまだ無い。
 
@@ -24,7 +27,7 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 
 | 種別 | 数 | 場所 |
 |---|---|---|
-| skills | 14 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
+| skills | 16 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
 | rules | 14 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守・問題解決の姿勢等) |
 | hooks | 6 本 + 共通基盤 | `hooks/scripts/*.py` (+ `hook_common.py`)、設定は `hooks/rules/*.default.json` |
 | agents | 8 本 | `agents/*.md` (Claude Code サブエージェント定義) |

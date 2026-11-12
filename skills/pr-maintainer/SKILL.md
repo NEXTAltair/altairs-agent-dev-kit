@@ -1,14 +1,15 @@
 ---
 name: pr-maintainer
-description: "Maintain an agent-created pull request after creation or after draft-to-ready transition: mark reviewable draft PRs ready, poll CI and review comments with gh, repair failures in the same worktree/session, reply in Japanese, escalate design loops, and squash merge when safe. This skill defines the maintenance POLICY (what to repair, when to merge/escalate); the autonomous re-polling LOOP that reschedules itself without human restarts lives in pr-autoloop. Use after creating PRs or when asked to continue PR maintenance automation."
+description: "Maintain an agent-created pull request after creation or after draft-to-ready transition: mark reviewable draft PRs ready, poll CI and review comments with gh, repair failures in the same worktree/session, reply in the repository's working language, escalate design loops, and squash merge when safe. This skill defines the maintenance POLICY (what to repair, when to merge/escalate); the autonomous re-polling LOOP that reschedules itself without human restarts lives in pr-autoloop. Use after creating PRs or when asked to continue PR maintenance automation."
 metadata:
   short-description: "PR作成後のCI/レビュー監視、修正、返信、設計エスカレーション、squash mergeを共通運用する。"
 ---
 
 # PR Maintainer
 
-Follow the repository's PR maintenance policy/ADR, if one exists, when maintaining a PR created by Codex or
-Claude Code.
+Follow the repository's PR maintenance policy/ADR, if one exists, when maintaining a PR created by an agent.
+The skill is independent of language, stack, and harness: it needs only `git` and `gh`, and the one
+stack-specific input is the repository's own check command.
 
 ## When to Use
 
@@ -24,8 +25,8 @@ has already passed the repository's agreed local validation (see the project's t
 CI-equivalent filter), mark it ready for review in the same session and immediately enter the polling workflow.
 Do not leave a reviewable draft PR idle just because it was created with `--draft`.
 
-This skill is shared by Codex and Claude Code. GitHub I/O goes through `gh`; the agent-specific part is only
-the code-editing session that applies fixes in the existing worktree.
+GitHub I/O goes through `gh`; the agent-specific part is only the code-editing session that applies fixes in
+the existing worktree and the way it waits between polls (see `pr-autoloop`).
 
 ## Core Policy
 
@@ -56,16 +57,20 @@ the code-editing session that applies fixes in the existing worktree.
 - Poll for at most 20 minutes, every 3 minutes.
 - Use `gh` / `gh api` for PR state, checks, failed logs, comments, issue creation, labels, replies, and merge.
 - Repair CI failures and review findings in the same worktree, then run the repo's normal pre-push validation.
-- Reply to every review comment in Japanese.
+- Reply to every review comment in the repository's working language: the language its maintainers use in
+  PR descriptions and issues, not the language the review bot happens to write in. If the project
+  instructions name a language for reviews, use that.
 - Do not auto-resolve review threads.
 - Allow up to 4 repair loops.
 - If repair loops continue after the 4th attempt, or review fixes create more design-level review findings,
   stop and escalate to design discussion.
-- Merge without human intervention only when bot review has completed cleanly and required checks are clean.
-- Treat an empty review/comment set as "review not completed yet", not as clean.
+- Merge without human intervention only when the review gate (see "Review gate") is satisfied and required
+  checks are clean.
+- In a repository that has a review bot, treat an empty review/comment set as "review not completed yet",
+  not as clean.
 - Use squash merge.
 - After a PR is merged, immediately clean up the merged worktree under the project's worktree directory
-  (see the repository's git-workflow rules) so its `.venv` and other build artifacts do not linger.
+  (see the repository's git-workflow rules) so its dependency environment and build artifacts do not linger.
 
 ## Polling Workflow
 
@@ -86,7 +91,38 @@ gh pr view "$PR" --json \
 gh pr checks "$PR" --json name,state,bucket,link,startedAt,completedAt,workflow
 ```
 
-Review completion gate:
+`gh pr checks --json` needs a recent `gh` (it is missing in 2.45). On an older `gh`, read the checks from
+`statusCheckRollup` in the first command instead.
+
+## Review gate
+
+Decide once per PR, before the first poll, what "review completed" means in this repository. Record the
+decision in the final report.
+
+1. **The project instructions name it.** If `AGENTS.md` / `CLAUDE.md` / the PR policy doc names a review bot,
+   or says there is none, use that.
+2. **Otherwise look at recent history.** Check the last 5 merged PRs for artifacts from bot accounts:
+
+   ```bash
+   for N in $(gh pr list --repo "$REPO" --state merged --limit 5 --json number --jq '.[].number'); do
+     gh api --paginate "repos/$REPO/issues/$N/reactions?per_page=100" --jq '.[] | select(.user.type=="Bot") | .user.login'
+     gh api --paginate "repos/$REPO/pulls/$N/reviews?per_page=100"    --jq '.[] | select(.user.type=="Bot") | .user.login'
+     gh api --paginate "repos/$REPO/pulls/$N/comments?per_page=100"   --jq '.[] | select(.user.type=="Bot") | .user.login'
+   done | sort | uniq -c
+   ```
+
+   - A bot reviewed those PRs → that bot is the expected reviewer. Wait for its artifact on this PR and apply
+     the completion gate below.
+   - No bot artifact on any of them → the repository has no bot review. The gate is: required checks are
+     green, and no unresolved change request or blocking comment from a human reviewer. Do not wait 20 minutes
+     for a review that will never arrive.
+3. **No CI checks are configured** (`statusCheckRollup` is empty after the first few minutes): run the
+   repository's check command locally on the PR head and post the command and its result as a PR comment
+   before merging. Without CI, that comment is the only record that the head was verified.
+
+A human review that requests changes always blocks the merge, whichever gate applies.
+
+Review completion gate (repositories with a review bot; the Codex connector is the documented example):
 
 - Do not merge immediately after CI success.
 - Continue polling until the expected Codex/Bot review signal appears as a PR review, review comment,
@@ -138,9 +174,10 @@ When CI fails or review comments require changes:
 1. Read the failed logs and review comments.
 2. Decide whether each finding is valid.
 3. Apply the smallest coherent fix in the existing PR worktree.
-4. Run the repository's normal validation before push, including tests, Ruff, and mypy as applicable.
+4. Run the repository's own check command before push (tests, lint, and type checks; the same scope CI runs).
+   If it is not documented, find it as described in `issue-to-merge` ("検査コマンドを特定する").
 5. Commit and push the repair.
-6. Reply to every review comment in Japanese.
+6. Reply to every review comment in the repository's working language.
 
 Reply format:
 
@@ -224,7 +261,7 @@ cd "$PROJECT_ROOT"
 git worktree remove "$WORKTREE_PATH"
 ```
 
-Do not leave the merged worktree or its `.venv` behind.
+Do not leave the merged worktree or its dependency environment behind.
 
 ## State
 

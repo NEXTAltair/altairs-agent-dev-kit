@@ -72,6 +72,9 @@ Claude Code 以外の 3 つが直接読む skill の置き場である。kit は
 | agents | `~/.claude/agents/`、`~/.codex/agents/`、`~/.gemini/config/agents/` | Claude Code / Codex / Antigravity |
 | 導入記録 | `~/.agents/agent-kit/install.json` | — |
 
+skills の実体が既にあるとき (先に別のハーネス向けに導入した、link を消した) は、`install` が足りない link だけを足す。
+`--force` は実体を入れ直すときだけ要る。
+
 `~/.agents/rules/` は kit が決めた置き場で、Codex が自動で読む場所ではない。Codex は `~/.codex/AGENTS.md` の
 索引に書かれたパスを辿って読む。
 

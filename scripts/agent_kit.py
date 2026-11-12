@@ -275,49 +275,115 @@ def skill_source(explicit: str | None) -> str:
     return f"github:{match[1]}/{match[2]}#{tag}"
 
 
-def install_skills(ctx: Context, source: str | None, state: dict) -> None:
-    wanted = ctx.selected("skills")
+def skills_to_install(ctx: Context) -> list[str]:
     canonical = ctx.root / ".agents/skills"
-    names = [name for name in wanted if ctx.force or not (canonical / name).exists()]
-    for name in sorted(set(wanted) - set(names)):
+    return [name for name in ctx.selected("skills") if ctx.force or not (canonical / name).exists()]
+
+
+def skill_link_dirs(ctx: Context) -> list[Path]:
+    """`.agents/skills` を直接読まないハーネスの skill 置き場 (canonical への link を置く)。"""
+    directories = []
+    if "claude" in ctx.harnesses:
+        directories.append(ctx.root / ".claude/skills")
+    if "antigravity" in ctx.harnesses and ctx.scope == "global":
+        directories.append(ctx.root / ".gemini/config/skills")
+    return directories
+
+
+def reconcile_skill_links(ctx: Context) -> None:
+    """canonical にある skill へ、足りないハーネス側の link だけを足す。
+
+    canonical を置き換えるか (--force) とは別の判断。Codex 向けに導入済みの repository へ後から
+    Claude Code を足す、消えた link を戻す、といった場合に --force なしで揃える。
+    """
+    canonical = ctx.root / ".agents/skills"
+    for directory in skill_link_dirs(ctx):
+        for name in ctx.selected("skills"):
+            source, link = canonical / name, directory / name
+            if not (source / "SKILL.md").is_file() or link.exists():
+                continue
+            target = os.path.relpath(source, directory)
+            if link.is_symlink() and os.readlink(link) != target:
+                continue  # 利用者が別の場所へ張った (切れている) link は残す
+            print(f"LINK: {link} -> {target}")
+            if ctx.dry_run:
+                continue
+            directory.mkdir(parents=True, exist_ok=True)
+            link.unlink(missing_ok=True)
+            try:
+                link.symlink_to(target, target_is_directory=True)
+            except OSError:  # symlink を作れない環境 (権限の無い Windows) では複製する
+                shutil.copytree(source, link)
+
+
+def install_skills(ctx: Context, source: str | None, state: dict) -> None:
+    names = skills_to_install(ctx)
+    for name in sorted(set(ctx.selected("skills")) - set(names)):
         print(f"SKIP (exists): skill {name}")
-    if not names:
-        return
-    command = ["npx", "--yes", "skills@1", "add", skill_source(source), "--skill", *names,
-               "--agent", *skill_agents(ctx), "-y"]
-    if ctx.scope == "global":
-        command.append("-g")
-    print("RUN: " + " ".join(command))
-    if ctx.dry_run:
-        return
-    if shutil.which("npx") is None:
-        raise KitError("skills の導入には Node.js (npx) が必要。--components で skills を外すか Node.js を導入する")
-    env = dict(os.environ)
-    if ctx.scope == "global":
-        env["HOME"] = env["USERPROFILE"] = str(ctx.root)
-    subprocess.run(command, cwd=ctx.root, env=env, check=True)
-    state["skills"] = sorted(set(state.get("skills", [])) | set(names))
+    if names:
+        command = ["npx", "--yes", "skills@1", "add", skill_source(source), "--skill", *names,
+                   "--agent", *skill_agents(ctx), "-y"]
+        if ctx.scope == "global":
+            command.append("-g")
+        print("RUN: " + " ".join(command))
+        if not ctx.dry_run:
+            env = dict(os.environ)
+            if ctx.scope == "global":
+                env["HOME"] = env["USERPROFILE"] = str(ctx.root)
+            subprocess.run(command, cwd=ctx.root, env=env, check=True)
+            state["skills"] = sorted(set(state.get("skills", [])) | set(names))
+    reconcile_skill_links(ctx)
 
 
-def install_hooks(ctx: Context) -> None:
-    if ctx.scope != "project":
-        raise KitError("hooks は project scope 専用 (runtime を checkout ごとに固定するため)")
+def harness_installer():
+    sys.path.insert(0, str(KIT / "scripts"))
+    import install_harness
+    return install_harness
+
+
+def record_if_current(ctx: Context, state: dict, path: Path, expected: bytes | None = None) -> None:
+    """kit が書いた内容のままのファイルだけを所有として記録する。"""
+    if path.is_file() and (expected is None or path.read_bytes() == expected):
+        state["files"][relative(ctx, path)] = digest(path.read_bytes())
+
+
+def install_hooks(ctx: Context, state: dict) -> None:
     if not {"claude", "codex"} & set(ctx.harnesses):
         print("NOTE: hooks の配線は claude / codex のみ。他のハーネスは docs/harness-matrix.md を参照")
         return
-    sys.path.insert(0, str(KIT / "scripts"))
-    import install_harness
+    installer = harness_installer()
+    if ctx.dry_run:
+        print(f"RUN: hook runtime を {ctx.root} に固定し、{' / '.join(sorted({'claude', 'codex'} & set(ctx.harnesses)))} の配線を用意")
+        return
     try:
-        install_harness.require_git_checkout(ctx.root)
-        if ctx.dry_run:
-            print(f"RUN: install_harness.install({ctx.root})")
-            return
-        wiring = install_harness.install(ctx.root, ctx.force)
+        installer.install_runtime(ctx.root, ctx.force)
+        record_if_current(ctx, state, ctx.root / installer.LOCK)
+        if "codex" in ctx.harnesses:
+            wiring = (json.dumps(installer.codex_wiring(), indent=2) + "\n").encode()
+            installer.write_config(ctx.root / ".codex/hooks.json", wiring.decode(), ctx.force)
+            record_if_current(ctx, state, ctx.root / ".codex/hooks.json", wiring)
     except (ValueError, RuntimeError, FileExistsError) as error:
         raise KitError(str(error)) from error
     if "claude" in ctx.harnesses:
         print("Merge this hooks object into .claude/settings.json:")
-        print(json.dumps(wiring, indent=2))
+        print(json.dumps(installer.claude_wiring(), indent=2))
+
+
+def preflight(ctx: Context, components: set[str], source: str | None) -> None:
+    """後の段で失敗すると分かる条件を、何も書き込む前に確かめる。"""
+    if "skills" in components and skills_to_install(ctx):
+        skill_source(source)
+        if not ctx.dry_run and shutil.which("npx") is None:
+            raise KitError("skills の導入には Node.js (npx) が必要。--components で skills を外すか Node.js を導入する。"
+                           "何も導入していない")
+    if "hooks" in components:
+        if ctx.scope != "project":
+            raise KitError("hooks は project scope 専用 (runtime を checkout ごとに固定するため)")
+        if {"claude", "codex"} & set(ctx.harnesses):
+            try:
+                harness_installer().require_git_checkout(ctx.root)
+            except ValueError as error:
+                raise KitError(str(error)) from error
 
 
 # ---------------------------------------------------------------- コマンド
@@ -391,17 +457,22 @@ def command_install(args: argparse.Namespace) -> None:
     print(f"scope={ctx.scope} root={ctx.root} harness={','.join(ctx.harnesses)} profile={','.join(ctx.profiles)}")
     if "python" in ctx.profiles and shutil.which("uv") is None:
         print("WARN: python profile の rules / hooks は uv を前提にしているが、uv が PATH に無い")
+    preflight(ctx, components, args.skill_source)
     state = load_state(ctx)
-    apply_files(ctx, plan_files(ctx, components), state)
-    apply_index(ctx, components, state)
-    if "skills" in components:
-        install_skills(ctx, args.skill_source, state)
-    if "hooks" in components:
-        install_hooks(ctx)
-    state.update(version=kit_version(), scope=ctx.scope, harnesses=list(ctx.harnesses), profiles=list(ctx.profiles))
-    if not ctx.dry_run:
-        ctx.state_path.parent.mkdir(parents=True, exist_ok=True)
-        ctx.state_path.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    try:
+        apply_files(ctx, plan_files(ctx, components), state)
+        apply_index(ctx, components, state)
+        if "skills" in components:
+            install_skills(ctx, args.skill_source, state)
+        if "hooks" in components:
+            install_hooks(ctx, state)
+    finally:
+        # 途中の段が失敗しても、そこまでに書いたものの所有を残す (uninstall と次回の更新が拠り所にする)。
+        state.update(version=kit_version(), scope=ctx.scope, harnesses=list(ctx.harnesses),
+                     profiles=list(ctx.profiles))
+        if not ctx.dry_run:
+            ctx.state_path.parent.mkdir(parents=True, exist_ok=True)
+            ctx.state_path.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print("DONE (dry-run)" if ctx.dry_run else "DONE")
 
 
@@ -409,12 +480,34 @@ def resolve(ctx: Context, key: str) -> Path:
     return Path(key) if Path(key).is_absolute() else ctx.root / key
 
 
+CLAUDE_WIRING_MARK = "exec(zlib.decompress(base64.b64decode("
+
+
+def claude_hooks_wired(ctx: Context) -> bool:
+    """Claude Code の settings に kit の hook 起動コードが残っているか。"""
+    for name in (".claude/settings.json", ".claude/settings.local.json"):
+        try:
+            if CLAUDE_WIRING_MARK in (ctx.root / name).read_text(encoding="utf-8"):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def command_uninstall(args: argparse.Namespace) -> None:
     ctx = build_context(args)
     state = load_state(ctx)
+    lock = harness_installer().LOCK
+    kept: dict[str, str] = {}
     for key, recorded in sorted(state["files"].items()):
         path = resolve(ctx, key)
         if not path.is_file():
+            continue
+        if key == lock and claude_hooks_wired(ctx):
+            # lock だけ消すと、残った配線が起動に失敗して全ての tool 呼び出しを拒否する。
+            print(f"KEEP (Claude Code の hook 配線が残っている): {path}\n"
+                  "  .claude/settings.json の hooks から kit の登録を消してから、もう一度 uninstall する")
+            kept[key] = recorded
             continue
         if digest(path.read_bytes()) != recorded and not ctx.force:
             print(f"KEEP (変更あり): {path}")
@@ -433,8 +526,14 @@ def command_uninstall(args: argparse.Namespace) -> None:
     if state.get("skills"):
         print("NOTE: skills は skills.sh の管理下。削除は `npx skills remove "
               + ("-g " if ctx.scope == "global" else "") + " ".join(state["skills"]) + "`")
+    if lock in state["files"]:
+        print("NOTE: 共有の hook runtime (.agent-kit/runtimes/) は他の worktree が使うので残している")
     if not ctx.dry_run and ctx.state_path.is_file():
-        ctx.state_path.unlink()
+        if kept:  # 残したファイルの所有は、次の uninstall のために記録し続ける
+            ctx.state_path.write_text(json.dumps({**state, "files": kept, "skills": [], "index": None},
+                                                 indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        else:
+            ctx.state_path.unlink()
     print("DONE (dry-run)" if ctx.dry_run else "DONE")
 
 

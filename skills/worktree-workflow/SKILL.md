@@ -1,6 +1,6 @@
 ---
 name: worktree-workflow
-description: "Operate Git worktrees under .agents/worktree/ for implementation work: one-time setup (.gitignore, VS Code detection settings), start a worktree with a branch, work inside it with the shared venv, recover when the pre-edit hook blocks a shared-checkout edit, assign worktrees to parallel workers, hand off to PR, and clean up after merge. Use when starting implementation on an Issue/feature, when a hook message says to start from a worktree, or when asked to 「worktree 切って」「ワークツリー作って」「worktree 掃除」「ワークツリー削除」. Do NOT use for: PR polling/repair/merge (pr-maintainer, pr-autoloop) or deciding whether worktree is required (that policy lives in rules/git-workflow.md)."
+description: "Operate Git worktrees under .agents/worktree/ for implementation work: one-time setup (.gitignore, VS Code detection settings), start a worktree with a branch, work inside it with the project's dependency environment, recover when the pre-edit hook blocks a shared-checkout edit, assign worktrees to parallel workers, hand off to PR, and clean up after merge. Use when starting implementation on an Issue/feature, when a hook message says to start from a worktree, or when asked to 「worktree 切って」「ワークツリー作って」「worktree 掃除」「ワークツリー削除」. Do NOT use for: PR polling/repair/merge (pr-maintainer, pr-autoloop) or deciding whether worktree is required (that policy lives in rules/git-workflow.md)."
 metadata:
   short-description: ".agents/worktree/ 配下の worktree の初期設定・作成・作業・hook ブロックからの復帰・並列割当・PR 引き継ぎ・掃除の手順。"
 ---
@@ -9,7 +9,7 @@ metadata:
 
 `.agents/worktree/<name>` に置く専用 worktree の **手順** を定める。「いつ worktree が必須か」「例外は何か」という
 方針は [rules/git-workflow.md](../../rules/git-workflow.md) が持つので、ここでは繰り返さない。
-このスキルは Claude Code と Codex の両方で使う。Claude Code では `--worktree` や isolation 起動時に
+このスキルは言語・スタック・ハーネスに依存しない (`git` と `gh` だけを使う)。Claude Code では `--worktree` や isolation 起動時に
 kit の WorktreeCreate hook が作成を代行するので、その場合は「作成後の手順」から入る。終了時の削除も
 WorktreeRemove hook が代行するが、未コミット変更・lock・init 済み submodule を含む worktree、
 ブランチを切らずに commit した (どのブランチからも到達できない) worktree、キャッシュ以外の ignore 対象
@@ -58,9 +58,14 @@ Source Control から、どちらもここを見ればよい。
 
    Source Control の Repositories ビューで worktree が並び、multi-repo モードなら差分も横断表示される。
 
-3. **共有 venv の常設** (Python/uv): `.claude/settings.json` の `env` に
-   `UV_PROJECT_ENVIRONMENT=<project_root>/.venv` が入っているか確認する。無ければ導入先の
-   parallel-execution.md の手順で追加する。これが無いと worktree 内の素の `uv run` が別 venv を作る。
+3. **依存環境の置き方を決める**: worktree は source だけを持つ。依存 (仮想環境、`node_modules` 等) を
+   worktree ごとに作るか共有するかは、スタックで決まる。プロジェクトの rules に定めがあればそれに従う。
+
+   | スタック | 置き方 | 根拠 |
+   |---|---|---|
+   | Python + uv | 共有 checkout の `.venv` を全 worktree で共有する (`UV_PROJECT_ENVIRONMENT` を常設) | parallel-execution rule。worktree ごとに作ると数 GB 単位で増え、並列の `uv sync` が環境を壊す |
+   | Node.js (pnpm / npm) | worktree ごとに lockfile を変えない install を実行する (`pnpm install --frozen-lockfile` / `npm ci`) | 依存の解決が `node_modules` の位置に結び付くため共有できない。pnpm は実体を共有 store に置くので軽い |
+   | その他 | README / `AGENTS.md` の手順に従う。無ければ worktree ごとに作る | 共有は、そのスタックが位置に依存しないと確かめた場合だけ |
 
 ## Phase 1: Start a Worktree
 
@@ -95,16 +100,18 @@ cd ".agents/worktree/$NAME"
 
 - **cwd を worktree に固定する**。Bash の各呼び出しは絶対パスで worktree 内を指す。共有 checkout に
   戻って編集しない (hook が保護ディレクトリの編集を deny する)。
-- **venv は共有**: worktree ごとに `uv sync` / `uv venv` をしない。`UV_PROJECT_ENVIRONMENT` が常設されて
-  いれば素の `uv run pytest` でよい。効いていない shell では明示する:
+- **依存環境は Phase 0 で決めた置き方に従う**。共有する環境 (Python + uv の `.venv`) は worktree から作り直さない。
+  `UV_PROJECT_ENVIRONMENT` が常設されていれば素の `uv run ...` でよく、効いていない shell では明示する:
 
   ```bash
   UV_PROJECT_ENVIRONMENT="$(git rev-parse --path-format=absolute --git-common-dir | xargs dirname)/.venv" uv run pytest tests/test_x.py
   ```
 
-- **lockfile / venv を書き換える操作** (`uv sync`, `uv lock`, `uv add`) は共有 checkout で直列に行い、
-  worktree からは実行しない。詳細は parallel-execution.md。
-- **検証は最小単位から**: 触ったモジュールのテストだけ回し、全体は PR 前に一度 (problem-solving.md)。
+  worktree ごとに作る環境 (Node.js) は、worktree に入った直後に install を 1 回実行する。
+- **共有している環境や lockfile を書き換える操作** (依存の追加・更新・再解決) は並列に走らせない。
+  共有 venv のスタックでは共有 checkout で直列に行う (parallel-execution rule)。
+- **検証は最小単位から**: 触った範囲のテストだけ回し、プロジェクトの検査コマンド全体は PR 前に一度。
+  検査コマンドの探し方は `issue-to-merge` の「検査コマンドを特定する」。
 - commit / push はこの worktree 内で行う。`git push -u origin "$BRANCH"`。
 
 ## Phase 3: Recover From a Hook Block
@@ -133,8 +140,8 @@ cd ".agents/worktree/$NAME"
 - worker ごとに別 worktree、別ブランチ。名前は `<type>-issue-<n>-<scope>` のように担当範囲を含める。
 - 書き込み範囲 (担当ファイル/モジュール) を割当時に明示し、重なる範囲は 1 worker に寄せる。
 - リード側で作って絶対パスを渡すか、isolation 起動で hook に作らせる。どちらでも配置先は同じ。
-- 全 worker が同じ共有 venv を使うので、依存追加が要る worker はリードに依頼し、リードが共有 checkout で
-  直列に行う。
+- 依存環境を共有するスタックでは、依存の追加が要る worker はリードに依頼し、リードが共有 checkout で
+  直列に行う。worktree ごとに環境を持つスタックでも、lockfile の変更は 1 worker に寄せる (merge で衝突する)。
 
 ## Phase 5: Hand Off to PR
 
@@ -179,17 +186,19 @@ git worktree list --porcelain
 |---|---|
 | `fatal: '<branch>' is already checked out at ...` | そのブランチの worktree が既にある。`git worktree list` で場所を探して再利用 |
 | `git worktree add` 後に `.agents/worktree/x` が `git status` に出る | Phase 0 の `.gitignore` が未設定 |
-| worktree 内の `uv run` が `.venv` を新規作成し始めた | `UV_PROJECT_ENVIRONMENT` が効いていない。Phase 2 の明示形で実行し、settings の env を直す |
+| (Python + uv) worktree 内の `uv run` が `.venv` を新規作成し始めた | `UV_PROJECT_ENVIRONMENT` が効いていない。Phase 2 の明示形で実行し、settings の env を直す |
 | VS Code に worktree が出ない | Phase 0 の設定を確認。`git.detectWorktreesLimit` (既定 50) 超過も疑う |
 | `remove` が `contains modified or untracked files` で失敗 | 中身を確認。必要なら commit/stash、捨ててよければ `--force` |
 | worktree ディレクトリを手で消してしまった | `git worktree prune` で登録を消し、ブランチは `git branch -d` |
 | hook が worktree 作成に失敗してセッションが起動しない | stderr の `git worktree add 失敗` を読む。多くは同名ディレクトリの残骸。`prune` 後に再実行 |
+| merge 後も worktree が消えず `node_modules` 等が残っている | hook が消すのは作り直せると分かっている ignore 対象だけ (Python のキャッシュ、`node_modules`、`*.tsbuildinfo`、`.eslintcache`)。それ以外の生成物 (`dist/` 等) が残っていれば Phase 6 で手動削除 |
 | `WorktreeRemove hook failed; kept worktree` | hook は `--force` を使わないので、変更・lock・submodule を含む worktree は残る。HEAD がどのブランチからも到達できない場合 (必要なら `git branch <name>` で保持) と、キャッシュ以外の ignore 対象がある場合も残る。中身を確認して Phase 6 の手順で削除 |
 
 ## Related
 
 - [rules/git-workflow.md](../../rules/git-workflow.md): worktree が必須になる条件、例外、完了の定義
-- [rules/parallel-execution.md](../../rules/parallel-execution.md): 共有 venv と並列実行の詳細
+- [rules/parallel-execution.md](../../rules/parallel-execution.md): (Python + uv) 共有 venv と並列実行の詳細
+- issue-to-merge: Issue から merge までの全体の流れと、中断からの再開
 - pr-maintainer / pr-autoloop: PR 作成後の保守
 - kit hooks: `hook_worktree_create.py` (作成の代行), `hook_worktree_remove.py` (削除の代行),
   `hook_pre_edit_worktree.py` (共有 checkout の編集ゲート)
