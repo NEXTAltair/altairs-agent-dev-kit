@@ -9,6 +9,36 @@ timestamp: 2026-07-02
 `altairs-agent-dev-kit` は skills / rules / hooks / agents / Codex 設定を任意のリポジトリへ導入するための
 汎用コア kit。3 つの導入経路と、導入後にプロジェクト固有の値を上書きする方法をまとめる。
 
+## 0. 複数ハーネスへの導入 (`scripts/agent_kit.py`)
+
+Claude Code / Codex / Antigravity / OpenClaw のどれを使う場合も、まず `agent_kit.py` を使えばよい。
+global には core の部品、project にはスタック依存の部品を置く。配置先の一覧は
+[harness-matrix.md](harness-matrix.md)、設計判断は [ADR-0011](decisions/0011-multi-harness-framework.md) を参照。
+
+```bash
+python3 scripts/agent_kit.py list                                              # 部品の分類を確認
+python3 scripts/agent_kit.py install --scope global --dry-run                  # 予定を確認
+python3 scripts/agent_kit.py install --scope global
+python3 scripts/agent_kit.py install --scope project --target /path/to/your-repo
+python3 scripts/agent_kit.py install --scope project --target /path/to/your-repo --components all   # hooks も
+python3 scripts/agent_kit.py status --scope project --target /path/to/your-repo
+```
+
+- **rules**: 原本は `rules/*.md`。Claude Code には `.claude/rules/`、Antigravity には `trigger:` frontmatter を付けて
+  `.agents/rules/` へ置く。Codex と OpenClaw は rules を自動で読まないので、`AGENTS.md` の
+  `<!-- agent-kit:begin -->` 〜 `<!-- agent-kit:end -->` に索引を書き、そこから `.agents/rules/` を読ませる。
+  区画の外の本文は変更しない。`CLAUDE.md` は編集しない
+- **agents**: Claude Code は `agents/*.md`、Codex は `codex/agents/*.toml`、Antigravity は `antigravity/agents/*.md`。
+  後の 2 つは生成物で、`agents/*.md` を変えたら `scripts/generate_codex_agents.py` と
+  `scripts/generate_antigravity_agents.py` で再生成する
+- **skills**: skills.sh CLI に委ねる。実体は `.agents/skills/` (global は `~/.agents/skills/`)
+- **OpenClaw**: repository で作業するときは作業フォルダの `AGENTS.md` と `.agents/skills/` を読むので、project scope の
+  導入がそのまま効く。agent workspace や `openclaw.json` には触れない
+- **更新と削除**: 導入記録 (`.agent-kit/install.json`、global は `~/.agents/agent-kit/install.json`) に内容ハッシュを
+  残す。kit が置いて未変更のファイルだけを更新・削除し、利用者が変えたファイルは `--force` まで残す
+
+hooks の override の書き方 (2 章) は導入経路によらず同じ。以下の 1 章は従来の Claude Code + Codex 向け経路。
+
 ## 1. 導入経路
 
 いずれの経路も **uv がグローバルに導入されていること** を前提とする (hook の uv ガード、rules の共有 venv
