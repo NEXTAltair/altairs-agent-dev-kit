@@ -40,12 +40,12 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 
 ## クイックスタート
 
-`scripts/agent_kit.py` (Python 3.10 以降、標準ライブラリのみ) で導入する。v0.6.0 より後のリリースタグに含まれる。
+`scripts/agent_kit.py` (Python 3.10 以降、標準ライブラリのみ) で導入する。v0.7.0 以降のリリースタグに含まれる。
 
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
-git checkout <リリースタグ>
+git checkout v0.7.0
 
 # どのプロジェクトでも使う部品 (core の skills / rules / agents) を自分の環境へ
 python3 scripts/agent_kit.py install --scope global
@@ -71,7 +71,7 @@ python3 scripts/agent_kit.py install --scope project --target /path/to/your-repo
 ### install.sh (Claude Code + Codex、従来の経路)
 
 ```bash
-git checkout v0.6.0
+git checkout v0.7.0
 ./install.sh --target /path/to/your-repo --all
 ```
 
