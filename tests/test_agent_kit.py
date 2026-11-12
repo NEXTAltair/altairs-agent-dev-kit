@@ -366,10 +366,35 @@ def test_uninstall_keeps_lock_while_claude_wiring_remains(tmp_path, home, capsys
     assert not (repo / ".agent-kit/install.json").exists()
 
 
-def test_modified_codex_hooks_are_kept_by_uninstall(tmp_path, home):
+def test_modified_codex_hooks_keep_the_lock_they_depend_on(tmp_path, home, capsys):
     repo = git_repo(tmp_path / "edited")
     assert project(repo, home, harness="codex", components="hooks") == 0
     hooks = repo / ".codex/hooks.json"
+    lock = repo / ".agent-kit/hooks.lock.json"
+    original = hooks.read_text(encoding="utf-8")
+    hooks.write_text(json.dumps(json.loads(original), indent=4), encoding="utf-8")  # 整形し直しただけ
+    uninstall = ("uninstall", "--scope", "project", "--target", str(repo), "--home", str(home))
+
+    assert run(*uninstall) == 0
+    # 残した登録は lock が無いと起動に失敗し、shell と編集を全て拒否する
+    assert hooks.is_file() and lock.is_file()
+    assert ".codex/hooks.json" in capsys.readouterr().out
+    command = json.loads(hooks.read_text(encoding="utf-8"))["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+    import subprocess
+    result = subprocess.run(command, shell=True, cwd=repo, text=True, capture_output=True,
+                            input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "ls"}}))
+    assert result.returncode == 0 and "deny" not in result.stdout, result.stdout + result.stderr
+
+    # 登録を利用者が消したら、次の uninstall で lock も消える
+    hooks.unlink()
+    assert run(*uninstall) == 0
+    assert not lock.exists() and not (repo / ".agent-kit/install.json").exists()
+
+
+def test_force_uninstall_removes_modified_codex_hooks_and_the_lock(tmp_path, home):
+    repo = git_repo(tmp_path / "forced")
+    assert project(repo, home, harness="codex", components="hooks") == 0
+    hooks = repo / ".codex/hooks.json"
     hooks.write_text(hooks.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-    assert run("uninstall", "--scope", "project", "--target", str(repo), "--home", str(home)) == 0
-    assert hooks.is_file()
+    assert run("uninstall", "--scope", "project", "--target", str(repo), "--home", str(home), "--force") == 0
+    assert not hooks.exists() and not (repo / ".agent-kit/hooks.lock.json").exists()

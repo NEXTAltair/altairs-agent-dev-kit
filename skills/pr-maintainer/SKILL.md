@@ -145,7 +145,7 @@ Review completion gate (repositories with a review bot; the Codex connector is t
   P1/P2 inline comment as "review has blocking findings" regardless of the `+1` reaction.
 - If CI is green but there are no reviews/comments/reactions yet, keep waiting until the 20 minute polling timeout.
 - Only treat review as clean after a bot review artifact exists and contains no blocking findings.
-- If no bot review artifact appears within 20 minutes, comment on the PR in Japanese that CI is green but
+- If no bot review artifact appears within 20 minutes, comment on the PR, in the repository's working language, that CI is green but
   review did not complete within the polling window, then stop without merging.
 
 Commands to gather clean-reaction state:
@@ -229,7 +229,8 @@ On escalation:
 
 1. Add design/escalation labels to the PR when available.
 2. Create a GitHub issue describing the design problem and options.
-3. Comment on the PR in Japanese with the issue link, summary, options, and what user decision is needed.
+3. Comment on the PR, in the repository's working language, with the issue link, summary, options, and what
+   user decision is needed.
 4. Stop without merging.
 
 ## Merge Rules

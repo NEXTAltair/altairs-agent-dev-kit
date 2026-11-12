@@ -480,18 +480,29 @@ def resolve(ctx: Context, key: str) -> Path:
     return Path(key) if Path(key).is_absolute() else ctx.root / key
 
 
-CLAUDE_WIRING_MARK = "exec(zlib.decompress(base64.b64decode("
+WIRING_MARK = "exec(zlib.decompress(base64.b64decode("
 
 
-def claude_hooks_wired(ctx: Context) -> bool:
-    """Claude Code の settings に kit の hook 起動コードが残っているか。"""
-    for name in (".claude/settings.json", ".claude/settings.local.json"):
+def remaining_hook_wiring(ctx: Context, state: dict) -> list[str]:
+    """uninstall の後も kit の hook 起動コードを持ち続けるファイル。
+
+    起動コードは lock が無いと失敗し、全ての tool 呼び出しを拒否する。配線が 1 つでも残る間は lock を消さない。
+    Claude Code の settings は kit が書かないので常に残る。Codex の hooks.json は、利用者が変更していれば
+    uninstall が残す (--force なら消す)。
+    """
+    remaining = []
+    for name in (".claude/settings.json", ".claude/settings.local.json", ".codex/hooks.json"):
+        path = ctx.root / name
         try:
-            if CLAUDE_WIRING_MARK in (ctx.root / name).read_text(encoding="utf-8"):
-                return True
-        except OSError:
+            if WIRING_MARK not in path.read_text(encoding="utf-8"):
+                continue
+        except (OSError, UnicodeDecodeError):
             continue
-    return False
+        recorded = state["files"].get(name)
+        removable = recorded is not None and (ctx.force or digest(path.read_bytes()) == recorded)
+        if not removable:
+            remaining.append(name)
+    return remaining
 
 
 def command_uninstall(args: argparse.Namespace) -> None:
@@ -499,14 +510,15 @@ def command_uninstall(args: argparse.Namespace) -> None:
     state = load_state(ctx)
     lock = harness_installer().LOCK
     kept: dict[str, str] = {}
+    wired = remaining_hook_wiring(ctx, state) if lock in state["files"] else []
     for key, recorded in sorted(state["files"].items()):
         path = resolve(ctx, key)
         if not path.is_file():
             continue
-        if key == lock and claude_hooks_wired(ctx):
+        if key == lock and wired:
             # lock だけ消すと、残った配線が起動に失敗して全ての tool 呼び出しを拒否する。
-            print(f"KEEP (Claude Code の hook 配線が残っている): {path}\n"
-                  "  .claude/settings.json の hooks から kit の登録を消してから、もう一度 uninstall する")
+            print(f"KEEP (hook の配線が残っている): {path}\n"
+                  f"  {', '.join(wired)} から kit の hook 登録を消してから、もう一度 uninstall する")
             kept[key] = recorded
             continue
         if digest(path.read_bytes()) != recorded and not ctx.force:
