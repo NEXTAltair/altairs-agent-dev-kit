@@ -112,6 +112,21 @@ def test_profile_limits_stack_specific_parts(tmp_path, home):
     assert not (plain / ".claude/agents/query-analyzer.md").exists()
 
 
+def test_typescript_profile_is_detected_from_package_json(tmp_path, home):
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "package.json").write_text('{"name": "web"}\n', encoding="utf-8")
+    assert project(web, home) == 0
+    style = (web / ".agents/rules/typescript-style.md").read_text(encoding="utf-8")
+    assert style.startswith("---\ntrigger: glob\n") and '"**/*.ts, **/*.tsx, ' in style
+    assert (web / ".claude/rules/typescript-style.md").read_text(encoding="utf-8").startswith(
+        '---\npaths:\n  - "**/*.ts"\n')
+    assert (web / ".agents/rules/typescript-dependencies.md").is_file()
+    # Python 向けの rule は入らない
+    assert not (web / ".agents/rules/coding-style.md").exists()
+    assert "typescript-testing.md" in (web / "AGENTS.md").read_text(encoding="utf-8")
+
+
 def test_index_block_keeps_existing_instructions_and_is_replaced_in_place(repo, home):
     (repo / "AGENTS.md").write_text("# My project\n\nExisting notes.\n", encoding="utf-8")
     assert project(repo, home) == 0

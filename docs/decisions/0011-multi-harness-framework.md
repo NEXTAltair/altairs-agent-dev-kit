@@ -23,7 +23,7 @@ kit は Claude Code と Codex、Python/uv プロジェクトだけを対象に�
 1. **共通の土台は `AGENTS.md` と `.agents/skills/`**。4 つすべてが読む指示ファイルは `AGENTS.md` だけで、
    `.agents/skills/` は Claude Code 以外の 3 つが直接読む。差がある部分 (rules の frontmatter、agent 定義の形式) だけを
    ハーネス別に生成する。
-2. **部品の分類は `kit.json` に一本化する**。skill / rule / agent ごとに `profile` (core / python / qt / sql) と
+2. **部品の分類は `kit.json` に一本化する**。skill / rule / agent ごとに `profile` (core / python / typescript / qt / sql) と
    推奨 `scope` (global / project) を持つ。rule は読み込み方 (`always` / `on-demand` / `glob`) と説明も持つ。
    - global: どのプロジェクトでも同じ内容で効いてよいもの。profile は core に限る (テストで固定)
    - project: スタックに依存するもの、または repository の構成 (worktree、ADR の置き場) を前提にするもの
@@ -55,11 +55,28 @@ kit は Claude Code と Codex、Python/uv プロジェクトだけを対象に�
 - **global の hooks**。runtime を checkout ごとに固定する設計と両立する形を決めていない。
 - **Codex / Antigravity の plugin 形式での配布**。kit のルートを複数の plugin 形式で同時に成立させるには、
   Claude Code 形式の原本 (`rules/`、`agents/`) と生成物の置き場を分ける必要がある。
-- **rules 本文の書き換え**。python profile の rule は uv / Ruff を前提にしたまま。他言語の profile は追加していない。
+- **既存の rules 本文の書き換え**。python profile の rule は uv / Ruff を前提にしたまま。
+- **typescript profile の skills / agents / hook の既定値**。rules 3 本だけを足した。`code-reviewer` や `test-runner` は
+  Python 向けのままで、TypeScript 向けの版は無い。
+
+## typescript profile を足した理由
+
+利用者は自分で始めるときは Python を使うが、エージェントに任せると TypeScript / JavaScript が選ばれ、利用者自身は
+その 2 つを読まない (2026-11-12)。そこで rules は次の方針で書いた。
+
+- 読まない人が品質を確かめる手段は機械の検査しかないので、型チェック・lint・テストを 1 コマンド (`check`) にまとめ、
+  抑制の書き方 (`@ts-ignore`、`any`、`as unknown as`) を禁止する
+- 型チェッカが通してしまう誤り (待ち忘れた Promise、`@ts-ignore`) を linter 側で止める設定を持つ
+- 成果の報告を、コードの引用ではなく実行したコマンドの出力と観察できる動作で示す節を置く
+- npm は公開直後の悪意ある版と install 時スクリプトの事故が多いので、依存の rule は入れる前の防御を先に書く
+
+設定例は TypeScript 7.0.2 / Biome 2.6.6 / vitest 5.1.0 / pnpm 12.4.2 / Node.js 24.22 の一時プロジェクトで実行して
+確かめた: strict な tsconfig が添字アクセスの `undefined` を検出、Biome が待ち忘れた Promise・`any`・`@ts-ignore` を
+検出、`minimumReleaseAge` が公開 1 日以内の版を避ける、hook の override が `npm install -g` だけを拒否する。
 
 ## 検証
 
-- `agy plugin validate --strict` (Antigravity CLI 1.5.5) で、生成した rules 11 本と agents 8 本が合格。原本に差し替えると落ちる
+- `agy plugin validate --strict` (Antigravity CLI 1.5.5) で、生成した rules 14 本と agents 8 本が合格。原本に差し替えると落ちる
 - skills.sh を一時 repository と隔離した HOME で実行し、project / global の配置を確認
 - `tests/test_agent_kit.py` は、利用者の変更の保持・global の選別・索引の置換・uninstall の範囲・skills.sh への
   引数を固定する。5 種類の変異 (利用者の変更を上書き、global に全部品、変更済みファイルの削除、索引の二重追記、

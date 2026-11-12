@@ -9,9 +9,10 @@ Claude Code 以外の 3 つが直接読む `.agents/skills/` を共通の土台�
 [docs/harness-matrix.md](docs/harness-matrix.md) にある。hooks は Claude Code と Codex のみ対応。
 OpenClaw 専用の skill / hook / plugin は OpenClaw 自身の SDK で定義するもので、kit には含めない。
 
-部品は `kit.json` で **profile** (core / python / qt / sql) と **推奨 scope** (global / project) に分類してある。
-core は言語・スタックに依存しない。python / qt / sql は Python + uv、PySide6/Qt、SQLAlchemy を前提にする
-(共有 venv 運用・`uv run` 前提の hook / rules を含む)。他言語向けの profile はまだ無い。
+部品は `kit.json` で **profile** (core / python / typescript / qt / sql) と **推奨 scope** (global / project) に
+分類してある。core は言語・スタックに依存しない。python / qt / sql は Python + uv、PySide6/Qt、SQLAlchemy を前提にする
+(共有 venv 運用・`uv run` 前提の hook / rules を含む)。typescript は TypeScript / JavaScript 向けの rules 3 本
+(型チェックと lint の設定、テスト、依存の導入) で、専用の skills / agents はまだ無い。
 
 「事故 → 原則 → 機械的強制」というサイクルで育った運用知見 (破壊的コマンドのブロック、
 worktree 分離、設定と文書の整合チェックなど) を、新規・既存を問わずどのリポジトリでも
@@ -24,7 +25,7 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 | 種別 | 数 | 場所 |
 |---|---|---|
 | skills | 14 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
-| rules | 11 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守・問題解決の姿勢等) |
+| rules | 14 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守・問題解決の姿勢等) |
 | hooks | 6 本 + 共通基盤 | `hooks/scripts/*.py` (+ `hook_common.py`)、設定は `hooks/rules/*.default.json` |
 | agents | 8 本 | `agents/*.md` (Claude Code サブエージェント定義) |
 | Codex 設定 | 一式 | `codex/config.toml.template`, `codex/agents/*.toml` (agents は生成物) |
@@ -53,7 +54,7 @@ python3 scripts/agent_kit.py install --scope project --target /path/to/your-repo
 | オプション | 既定 | 内容 |
 |---|---|---|
 | `--harness` | `auto` | `claude,codex,antigravity,openclaw` から選ぶ。`auto` は PATH 上の CLI と設定ディレクトリから検出 |
-| `--profile` | `auto` | `python,qt,sql` を選ぶ (core は常に含む)。`auto` は `pyproject.toml` から検出、`all` は全部 |
+| `--profile` | `auto` | `python,typescript,qt,sql` を選ぶ (core は常に含む)。`auto` は `pyproject.toml` / `package.json` から検出、`all` は全部 |
 | `--components` | `rules,agents,skills` | `hooks` を足すと Claude Code / Codex の hook runtime も導入 (project のみ)。`all` で全部 |
 | `--standalone` | off | project scope で global 向けの部品も repository へ入れる (global を導入していない人・CI・クラウド agent 向け) |
 | `--dry-run` | off | 書き込まずに予定を表示 |

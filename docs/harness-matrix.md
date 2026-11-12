@@ -86,7 +86,7 @@ Claude Code 以外の 3 つが直接読む skill の置き場である。kit は
 
 ## 検証した範囲
 
-- `agy plugin validate --strict` (1.5.5): kit が生成した rules 11 本と agents 8 本を一時 plugin に入れて合格。
+- `agy plugin validate --strict` (1.5.5): kit が生成した rules 14 本と agents 8 本を一時 plugin に入れて合格。
   生成前の原本 (`rules/testing.md`、`agents/test-runner.md`) に差し替えると 2 件のエラーで落ちることも確認
 - skills.sh: project は `-a codex claude-code`、global は `-a codex claude-code antigravity -g` で上表の配置になる
 - Claude Code / Codex / OpenClaw が導入後のファイルを実際のセッションで読み込むことは、この調査では確かめていない。

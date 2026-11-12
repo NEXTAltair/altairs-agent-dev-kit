@@ -335,6 +335,8 @@ def detect_profiles(root: Path) -> tuple[str, ...]:
         profiles.append("python")
         text = pyproject.read_text(encoding="utf-8", errors="replace").lower() if pyproject.is_file() else ""
         profiles += [name for name, needle in (("qt", "pyside"), ("sql", "sqlalchemy")) if needle in text]
+    if (root / "package.json").is_file() or (root / "tsconfig.json").is_file():
+        profiles.append("typescript")
     return tuple(profiles)
 
 
@@ -477,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
         sub.add_argument("--target", type=Path, help="project scope の導入先 repository")
         sub.add_argument("--home", type=Path, help="home ディレクトリを差し替える (検証用)")
         sub.add_argument("--harness", default="auto", help="auto または claude,codex,antigravity,openclaw")
-        sub.add_argument("--profile", default="auto", help="auto / all / python,qt,sql (core は常に含む)")
+        sub.add_argument("--profile", default="auto", help="auto / all / python,typescript,qt,sql (core は常に含む)")
         sub.add_argument("--standalone", action="store_true",
                          help="project scope で global 向けの部品も repository に入れる (global 導入の無い環境向け)")
         sub.add_argument("--force", action="store_true", help="利用者が変更したファイル・既存 skill も上書きする")
