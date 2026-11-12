@@ -1,6 +1,6 @@
 ---
 name: pr-autoloop
-description: "Run PR maintenance to completion automatically after an agent creates a PR or a draft PR becomes ready for review: keep polling CI and bot review with gh, repair failures and reply in Japanese in the same worktree, escalate design loops, and squash merge when safe, without waiting for a human to restart each poll cycle. Use right after an agent-created PR exists or transitions draft-to-ready. Do NOT use for human-authored PRs, and do NOT redefine repair/merge/escalation policy here (that lives in pr-maintainer)."
+description: "Run PR maintenance to completion automatically after an agent creates a PR or a draft PR becomes ready for review: keep polling CI and bot review with gh, repair failures and reply in the repository's working language in the same worktree, escalate design loops, and squash merge when safe, without waiting for a human to restart each poll cycle. Use right after an agent-created PR exists or transitions draft-to-ready. Do NOT use for human-authored PRs, and do NOT redefine repair/merge/escalation policy here (that lives in pr-maintainer)."
 metadata:
   short-description: "PR作成後の保守ループを人手の再起動なしに最後まで自走させる共通スキル。作法差分はCLAUDE.md/AGENTS.mdで吸収。"
   dependencies: "pr-maintainer"
@@ -9,8 +9,8 @@ metadata:
 # PR Autoloop
 
 Automatically drive the agent PR maintenance loop to a terminal state after a PR is created, without a
-human restarting each poll. This skill is shared by Codex and Claude Code; only the non-blocking wait
-mechanism differs per agent and is absorbed by each agent guide (see "Per-Agent Wait Mechanism").
+human restarting each poll. This skill is independent of language, stack, and harness; only the non-blocking
+wait mechanism differs per agent (see "Per-Agent Wait Mechanism").
 
 This is a **bounded time-based loop with goal-based stop conditions**. It polls an external system
 (GitHub PR state) on an interval, reacts to changed CI/review/mergeability state, and stops only on
@@ -21,7 +21,7 @@ well-defined PR maintenance workflow.
 
 This skill is the **autonomous looping layer**. It does not define policy.
 
-- All policy - draft gates, repair rules, repair-loop limit (4), Japanese review replies, design escalation,
+- All policy - draft gates, review gate, repair rules, repair-loop limit (4), reply language, design escalation,
   merge conditions, post-merge worktree cleanup - comes from the `pr-maintainer` skill and the repository's
   PR maintenance ADR/policy, if one exists.
 - This skill only specifies the contract for **how to keep the loop running by itself** until a terminal state.
@@ -62,13 +62,19 @@ Treat maintenance as a self-paced poll loop. One loop cycle:
    gh api --paginate "repos/$REPO/pulls/$PR_NUM/comments?per_page=100"
    ```
 
-   `$REPO` is `owner/repo` (e.g. `your-org/your-repo`).
+   `$REPO` is `owner/repo` (e.g. `your-org/your-repo`). On a `gh` without `gh pr checks --json`, read the
+   checks from `statusCheckRollup` in (a).
+
+   Steps (c) and (d) below are written for the Codex connector (`chatgpt-codex-connector[bot]`). Which bot to
+   expect, or that none is expected, comes from the "Review gate" in `pr-maintainer`: decide it before the
+   first cycle. With another bot, substitute its login and its own "clean" signal. With no review bot, (c)
+   and (d) still run every cycle to catch human comments, and the bot conditions in step 2 do not apply.
    `mergeStateStatus=CLEAN` means GitHub merge preconditions pass; it does **not** mean bot review is complete.
 
 2. Classify the cycle into exactly one outcome:
    - **continue** - any of these: CI checks still running (step b has pending checks); no `chatgpt-codex-connector[bot]` reaction yet on the PR issue (step c is empty or only `eyes`); CI is green but Codex review/reaction has not posted yet → schedule the next cycle.
-   - **repair** - any of these: CI checks failed (step b); Codex review state is `COMMENTED` and step d contains P1/P2 badge findings → fix in the PR worktree, validate, push, reply in Japanese per `pr-maintainer`, then continue (count the repair against the limit).
-   - **escalate** - repair limit reached, recurring findings in the same boundary, or a forbidden change is required → open the design issue, comment in Japanese, stop.
+   - **repair** - any of these: CI checks failed (step b); Codex review state is `COMMENTED` and step d contains P1/P2 badge findings → fix in the PR worktree, validate, push, reply per `pr-maintainer`, then continue (count the repair against the limit).
+   - **escalate** - repair limit reached, recurring findings in the same boundary, or a forbidden change is required → open the design issue, comment on the PR, stop.
    - **merge** - **all** of the following are true (verified from step 1 data above):
      1. CI: all required checks pass (step b - no failed or pending).
      2. Draft: `isDraft == false` (step a).
@@ -76,8 +82,10 @@ Treat maintenance as a self-paced poll loop. One loop cycle:
      4. No blocking findings: step d has no unaddressed P1/P2 Codex comments.
 
      ⚠️ `mergeStateStatus=CLEAN` with `reviewDecision=""` alone does **not** satisfy this gate.
+     In a repository with no review bot (per the Review gate), conditions 3 and 4 are replaced by: no
+     unresolved change request or blocking comment from a human reviewer.
      → squash merge, clean up the worktree, stop.
-   - **timeout** - total elapsed reached the polling window with no terminal result → comment in Japanese that CI/review did not complete in the window, stop.
+   - **timeout** - total elapsed reached the polling window with no terminal result → comment on the PR that CI/review did not complete in the window, stop.
 3. If the outcome is **continue**, wait the poll interval and start the next cycle automatically.
 
 The stop condition is not a prose judgment such as "the PR looks good". It is the conjunction of
@@ -101,6 +109,11 @@ hardcode a single mechanism here; follow your agent guide:
 - **Claude Code** → ScheduleWakeup self-pacing; fallback bounded `bash until` loop; never `sleep && <next>`.
 - **Codex** → inline session polling (no ScheduleWakeup). Keep the loop inside the active session and
   report the terminal state instead of relying on a platform routine to wake the agent later.
+- **Antigravity** → the built-in `schedule` tool (`DurationSeconds` for the next cycle, `MaxIterations` to
+  bound the window).
+- **OpenClaw** → a one-shot automation addressed to the current session; do not wait with `sleep`.
+- **Any other harness** → a scheduling primitive that wakes the same session if one exists; otherwise a
+  bounded in-session poll. State which one was used.
 
 導入先の `CLAUDE.md` / `AGENTS.md` に wait 機構のセクション (例: "pr-autoloop 実装") があれば
 それを優先する。無ければ上のデフォルトに従い、どの機構を使ったか報告する。

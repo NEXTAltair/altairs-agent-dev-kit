@@ -1,6 +1,6 @@
 # Git Workflow Rules
 
-Issue解決・機能開発時のブランチ戦略とワークツリー運用ルール。
+Issue解決・機能開発時のブランチ戦略とワークツリー運用ルール。言語・スタックに依存しない (`git` と `gh` だけを前提にする)。
 
 ## 実装作業は worktree から開始(必須)
 
@@ -29,7 +29,7 @@ git worktree add .agents/worktree/issue-123 -b fix/issue-123 origin/main
 
 完了の定義(ユーザーが明示的に「publish 前で止めて」「draft のまま」と言わない限り):
 1. worktree で実装
-2. lint / 型チェック([coding-style.md](coding-style.md) 参照)と CI-equivalent filter([testing.md](testing.md) 参照)で検証
+2. プロジェクトの検査コマンド (lint / 型チェック / テスト。CI が実行するものと同じ範囲) で検証。スタック別の rule (Python の coding-style / testing、TypeScript の typescript-style / typescript-testing) を導入していればそれに従う
 3. commit & push
 4. ready-for-review な PR を起票
 5. PR 保守自走(CI / bot レビュー)を回し、safe なら squash merge
@@ -40,6 +40,7 @@ git worktree add .agents/worktree/issue-123 -b fix/issue-123 origin/main
 > 注: kit の worktree 作成 hook (`hook_worktree_create.py`) は自動 worktree 作成を仲介する。手動 `git worktree add` も fallback として有効。
 > 初期設定 (.gitignore / VS Code 検出設定)、hook にブロックされた後の復帰、並列 worker への割当、merge 後の掃除までの
 > 具体的なコマンド手順は `worktree-workflow` skill (導入していれば) に集約している。本ファイルは方針のみを定める。
+> Issue の起票から merge までを通しで進める手順と、中断からの再開は `issue-to-merge` skill (導入していれば) にある。
 
 ### PR 保守自走の枠組み
 
@@ -97,8 +98,9 @@ git worktree remove .agents/worktree/fix-issue-123
 
 > **プロジェクト固有:** cleanup を自動化する Makefile ターゲット (`worktree-cleanup-merged` 等) があれば、ここにコマンドを追記する。
 
-## venv / 実行環境(ワークツリー内)
+## 依存環境(ワークツリー内)
 
-venv / 実行環境の分離粒度 (worktree 間でどこまで共有・分離するか、package 間でどう扱うか) は [parallel-execution.md](parallel-execution.md) に集約している。ワークツリー内でパッケージマネージャコマンドを実行する場合は、そちらのルールに従う (原則: 専用 venv を作らず共有実行環境を明示する)。
-
-並列で複数の同期系操作を走らせる場合の詳細ルールも [parallel-execution.md](parallel-execution.md) を参照。
+worktree は source だけを持つ。依存 (仮想環境、`node_modules` 等) を worktree 間で共有するか worktree ごとに作るかは
+スタックで決まる。Python + uv は共有 checkout の `.venv` を共有し (parallel-execution rule を導入していればそれに従う)、
+Node.js は worktree ごとに lockfile を変えない install を実行する。スタック別の手順は `worktree-workflow` skill の
+Phase 0 にある。共有している環境や lockfile を書き換える操作は、並列に走らせない。

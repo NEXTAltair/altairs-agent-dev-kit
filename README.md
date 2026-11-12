@@ -1,11 +1,21 @@
 # altairs-agent-dev-kit
 
-AI エージェント (Claude Code / Codex) 向けの開発標準一式 - skills / rules / hooks / agents / Codex 設定 -
-を、プロジェクト固有の値を含まない汎用コアとして切り出し、任意のリポジトリへ導入・追従できる形で配布する kit。
+AI エージェント向けの開発標準一式 - skills / rules / hooks / agents - を、プロジェクト固有の値を含まない
+汎用コアとして切り出し、任意のリポジトリへ導入・追従できる形で配布する kit。
 
-**対象は Python/uv プロジェクト** (共有 venv 運用・`uv run` 前提の hook / rules を含む)。
-GUI 関連の例は PySide6/Qt スタック前提。他言語・他スタックでも rules の原則や一部 skills は
-流用できるが、hooks の uv ガードなどはそのままでは適用されない。
+**対応ハーネスは Claude Code / Codex / Antigravity / OpenClaw**。4 つすべてが読む `AGENTS.md` と、
+Claude Code 以外の 3 つが直接読む `.agents/skills/` を共通の土台にし、rules の frontmatter や agent 定義の形式のように
+差がある部分だけをハーネス別に生成する。各ハーネスの配置先と対応状況は
+[docs/harness-matrix.md](docs/harness-matrix.md) にある。hooks は Claude Code と Codex のみ対応。
+OpenClaw 専用の skill / hook / plugin は OpenClaw 自身の SDK で定義するもので、kit には含めない。
+
+部品は `kit.json` で **profile** (core / python / typescript / qt / sql) と **推奨 scope** (global / project) に
+分類してある。core は言語・スタックに依存しない。Issue の起票から merge までの流れ (`issue-create` → `goal-prompt-crafter` →
+`worktree-workflow` → `pr-maintainer` / `pr-autoloop`、通しの手順は `issue-to-merge`、方針は git-workflow rule) は
+core かつ global で、どの言語のどの repository でも同じ手順で使える。スタックに依存するのは
+「プロジェクトの検査コマンド」だけで、その探し方も `issue-to-merge` が持つ。python / qt / sql は Python + uv、PySide6/Qt、SQLAlchemy を前提にする
+(共有 venv 運用・`uv run` 前提の hook / rules を含む)。typescript は TypeScript / JavaScript 向けの rules 3 本
+(型チェックと lint の設定、テスト、依存の導入) で、専用の skills / agents はまだ無い。
 
 「事故 → 原則 → 機械的強制」というサイクルで育った運用知見 (破壊的コマンドのブロック、
 worktree 分離、設定と文書の整合チェックなど) を、新規・既存を問わずどのリポジトリでも
@@ -17,19 +27,50 @@ worktree 分離、設定と文書の整合チェックなど) を、新規・既
 
 | 種別 | 数 | 場所 |
 |---|---|---|
-| skills | 14 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
-| rules | 11 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守・問題解決の姿勢等) |
+| skills | 16 本 | `skills/` (skills.sh 互換構造、プラグインからも参照) |
+| rules | 14 本 | `rules/*.md` (コーディング規約・git 運用・テスト・ログ・セキュリティ・ドキュメント保守・問題解決の姿勢等) |
 | hooks | 6 本 + 共通基盤 | `hooks/scripts/*.py` (+ `hook_common.py`)、設定は `hooks/rules/*.default.json` |
 | agents | 8 本 | `agents/*.md` (Claude Code サブエージェント定義) |
-| Codex 設定 | 一式 | `codex/config.toml.template`, `codex/agents/*.toml` |
+| Codex 設定 | 一式 | `codex/config.toml.template`, `codex/agents/*.toml` (agents は生成物) |
+| Antigravity agents | 8 本 | `antigravity/agents/*.md` (`agents/*.md` からの生成物) |
+| 部品の分類 | 1本 | `kit.json` (profile・推奨 scope・rule の読み込み方) |
+| 導入 CLI | 1本 | `scripts/agent_kit.py` (4 ハーネス、global / project) |
 | 設定整合 lint | 1本 | `scripts/check_config_consistency.py` |
 | skill lint | 1本 | `scripts/lint_skills.py` |
 
 ## クイックスタート
 
+`scripts/agent_kit.py` (Python 3.10 以降、標準ライブラリのみ) で導入する。v0.6.0 より後のリリースタグに含まれる。
+
 ```bash
 git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
+git checkout <リリースタグ>
+
+# どのプロジェクトでも使う部品 (core の skills / rules / agents) を自分の環境へ
+python3 scripts/agent_kit.py install --scope global
+
+# プロジェクトごとの部品 (スタック依存の rules / agents / skills、worktree 運用) を repository へ
+python3 scripts/agent_kit.py install --scope project --target /path/to/your-repo
+```
+
+| オプション | 既定 | 内容 |
+|---|---|---|
+| `--harness` | `auto` | `claude,codex,antigravity,openclaw` から選ぶ。`auto` は PATH 上の CLI と設定ディレクトリから検出 |
+| `--profile` | `auto` | `python,typescript,qt,sql` を選ぶ (core は常に含む)。`auto` は `pyproject.toml` / `package.json` から検出、`all` は全部 |
+| `--components` | `rules,agents,skills` | `hooks` を足すと Claude Code / Codex の hook runtime も導入 (project のみ)。`all` で全部 |
+| `--standalone` | off | project scope で global 向けの部品も repository へ入れる (global を導入していない人・CI・クラウド agent 向け) |
+| `--dry-run` | off | 書き込まずに予定を表示 |
+| `--force` | off | 利用者が変更したファイルと既存 skill も上書き |
+| `--skill-source` | checkout 中のタグ | タグの無い開発 checkout から skills を入れるときに kit のローカルパスを指定 |
+
+`status` で導入済みの版と変更・欠落したファイル、`uninstall` で kit が置いて未変更のファイルと `AGENTS.md` の管理区画を
+取り除ける。`list` は部品の分類を表示する。skills の導入は skills.sh CLI に委ねるので **Node.js (npx) が必要**
+(`--components rules,agents` なら不要)。python profile の rules / hooks は uv を前提にする。
+
+### install.sh (Claude Code + Codex、従来の経路)
+
+```bash
 git checkout v0.6.0
 ./install.sh --target /path/to/your-repo --all
 ```
@@ -115,6 +156,7 @@ NG ワード例、rules の追記ポイント、`check_config_consistency.py` �
 
 ## 設計原則
 
+0. **共通の土台 + ハーネス別の生成**: 原本は 1 つ (`rules/`、`agents/`、`skills/`)。`AGENTS.md` と `.agents/skills/` を全ハーネスの共通項にし、形式の違いは導入時・生成時に吸収する
 1. **事故 → 原則 → 機械的強制**: ルールは実際の事故を発端とし、人間やエージェントの注意力ではなく hook で機械的にブロックする
 2. **更新頻度で文書層を分ける**: 指針層 / 詳細層 (rules) / 実装層 (hook コード) を分離し、頻度の違う情報を混ぜない
 3. **frontmatter = SSoT、索引は生成物**: メタデータは frontmatter に一本化し、索引の手編集を禁止する
@@ -124,6 +166,7 @@ NG ワード例、rules の追記ポイント、`check_config_consistency.py` �
 
 ## ドキュメント
 
+- [docs/harness-matrix.md](docs/harness-matrix.md) - ハーネス別の配置先 (出典つき) と kit の対応・未対応
 - [docs/adoption.md](docs/adoption.md) - 導入手順の詳細とプロジェクト層 override の書き方
 - [docs/skill-install-runbook.md](docs/skill-install-runbook.md) - skill 導入/更新の runbook (canonical レイアウト・sourceType・github@ref bump・footgun 対策)
 - [docs/third-party-skills.md](docs/third-party-skills.md) - 同梱しないサードパーティ skill の推奨インストールリスト

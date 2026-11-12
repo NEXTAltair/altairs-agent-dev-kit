@@ -52,8 +52,9 @@ REMOVE_TIMEOUT = 30
 MIN_REMOVE_SECONDS = 10
 
 # 消しても作り直せる ignore 対象。これ以外の ignore 対象が 1 つでもあれば worktree を残す。
-DISPOSABLE_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".hypothesis"}
-DISPOSABLE_FILES = ("*.pyc", "*.pyo", ".coverage", ".coverage.*")
+DISPOSABLE_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".hypothesis",
+                   "node_modules"}
+DISPOSABLE_FILES = ("*.pyc", "*.pyo", ".coverage", ".coverage.*", "*.tsbuildinfo", ".eslintcache")
 # kit の hook が worktree 直下に書くデバッグログ (hook_common.get_log_dir)。
 DISPOSABLE_ROOT_DIRS = (".claude/logs/", ".codex/logs/")
 

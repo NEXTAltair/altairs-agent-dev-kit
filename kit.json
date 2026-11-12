@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "profiles": {
+    "core": "言語・スタックに依存しない作業原則と PR / 文書 / プロンプト運用",
+    "python": "Python + uv プロジェクト (Ruff / mypy / pytest / 共有 venv)",
+    "typescript": "TypeScript / JavaScript プロジェクト (tsc strict / Biome / vitest / pnpm)",
+    "qt": "PySide6 / Qt の GUI とそのテスト",
+    "sql": "SQLAlchemy / Alembic を使うデータ層"
+  },
+  "skills": {
+    "check-existing": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "docs-freshness-audit": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "goal-prompt-crafter": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "issue-create": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "issue-to-merge": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "okf-bundle": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "pr-autoloop": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "pr-maintainer": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "prompt-optimizer": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "qa-expert": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "skill-creator": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "worktree-workflow": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "interface-design": {
+      "profile": "qt",
+      "scope": "project"
+    },
+    "lazy-import-refactor": {
+      "profile": "python",
+      "scope": "project"
+    },
+    "pytest-qt-bdd": {
+      "profile": "qt",
+      "scope": "project"
+    },
+    "sqlalchemy-query-patterns": {
+      "profile": "sql",
+      "scope": "project"
+    }
+  },
+  "rules": {
+    "problem-solving": {
+      "profile": "core",
+      "scope": "global",
+      "activation": "always",
+      "description": "設計・バグ対応・ツール選定など「どう解くか」を決める場面の姿勢"
+    },
+    "unknowns-discovery": {
+      "profile": "core",
+      "scope": "global",
+      "activation": "always",
+      "description": "書かれていない前提を unknowns として記録し、手を止める条件を定める"
+    },
+    "documentation-maintenance": {
+      "profile": "core",
+      "scope": "global",
+      "activation": "on-demand",
+      "description": "ドキュメントを追加・更新・整理するとき。更新頻度で文書層を分け、索引は生成する"
+    },
+    "git-workflow": {
+      "profile": "core",
+      "scope": "global",
+      "activation": "always",
+      "description": "Issue 解決・機能開発のブランチ戦略、.agents/worktree/ での作業、PR から merge までの完了の定義 (言語非依存)"
+    },
+    "planning-memory": {
+      "profile": "core",
+      "scope": "project",
+      "activation": "on-demand",
+      "description": "計画・設計を始める前に ADR / 過去の計画 / lessons-learned を確認するとき"
+    },
+    "coding-style": {
+      "profile": "python",
+      "scope": "project",
+      "activation": "glob",
+      "globs": [
+        "**/*.py",
+        "pyproject.toml"
+      ],
+      "description": "Python 実装の lint / 型チェック設定と lint 結果の扱い"
+    },
+    "security": {
+      "profile": "python",
+      "scope": "project",
+      "activation": "glob",
+      "globs": [
+        "**/*.py"
+      ],
+      "description": "Ruff S ルールで検出できないセキュリティ判断 (秘密情報・入力検証等)"
+    },
+    "testing": {
+      "profile": "python",
+      "scope": "project",
+      "activation": "on-demand",
+      "description": "テストを書く・実行する・カバレッジを判断するとき (pytest)"
+    },
+    "logging": {
+      "profile": "python",
+      "scope": "project",
+      "activation": "on-demand",
+      "description": "ログ出力を追加・変更するとき。レベル設計と量の基準"
+    },
+    "dependency-management": {
+      "profile": "python",
+      "scope": "project",
+      "activation": "on-demand",
+      "description": "依存パッケージを追加・更新するとき。AI 推論 SDK は最新追従、他は計画的 bump"
+    },
+    "parallel-execution": {
+      "profile": "python",
+      "scope": "project",
+      "activation": "always",
+      "description": "uv を並列に走らせて共有 venv を壊さないための運用"
+    },
+    "typescript-style": {
+      "profile": "typescript",
+      "scope": "project",
+      "activation": "glob",
+      "globs": [
+        "**/*.ts",
+        "**/*.tsx",
+        "**/*.mts",
+        "**/*.cts",
+        "**/*.js",
+        "**/*.jsx",
+        "**/*.mjs",
+        "**/*.cjs",
+        "package.json",
+        "tsconfig.json"
+      ],
+      "description": "TypeScript / JavaScript の型チェック・lint 設定、検査結果の扱い、読まない人への成果の示し方"
+    },
+    "typescript-testing": {
+      "profile": "typescript",
+      "scope": "project",
+      "activation": "on-demand",
+      "description": "TypeScript / JavaScript のテストを書く・実行するとき (vitest 等)"
+    },
+    "typescript-dependencies": {
+      "profile": "typescript",
+      "scope": "project",
+      "activation": "on-demand",
+      "description": "npm パッケージを追加・更新するとき。package manager の固定と install 前の防御"
+    }
+  },
+  "agents": {
+    "investigation": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "library-research": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "solutions": {
+      "profile": "core",
+      "scope": "global"
+    },
+    "code-reviewer": {
+      "profile": "python",
+      "scope": "project"
+    },
+    "security-reviewer": {
+      "profile": "python",
+      "scope": "project"
+    },
+    "test-runner": {
+      "profile": "python",
+      "scope": "project"
+    },
+    "db-schema-reviewer": {
+      "profile": "sql",
+      "scope": "project"
+    },
+    "query-analyzer": {
+      "profile": "sql",
+      "scope": "project"
+    }
+  }
+}

@@ -10,10 +10,13 @@
 * [ADR-0008: PR autoloop は bounded time-based loop として扱い hook は adapter 分離する](decisions/0008-loop-contracts-and-hook-adapters.md) — PR 保守 loop の観測可能な停止条件と、provider 別の起動設定・共有 policy・branch 固定 runtime の責務を定義する
 * [ADR-0009: submodule の中にいても hook を動かし、動かせない場所からは cd で戻れるようにする](decisions/0009-submodule-cwd-and-bare-cd-escape.md) — submodule に cd しただけで全ツールが拒否され、戻る cd まで拒否されて詰む問題への対処。submodule は親 checkout の一部として扱い、hook が起動できない場所でも「引数 1 つの cd」だけは通す
 * [ADR-0010: Claude Code 2.1.290 / Codex 0.160.1 の hook 契約に追従する](decisions/0010-hook-contracts-2026-10.md) — WorktreeCreate の payload 名、WorktreeRemove の追加、NotebookEdit と Codex apply_patch の編集ゲート漏れを、実バイナリ・ソース・公式ドキュメントで確認して修正し、古い branch pin を壊さない runtime ファイル追加の規則を定めた
+* [ADR-0011: 4 ハーネス対応の導入 CLI と global / project の分類を持つ](decisions/0011-multi-harness-framework.md) — Claude Code / Codex に加えて Antigravity と OpenClaw へ導入できる agent_kit.py を追加し、部品を kit.json で profile と推奨 scope に分類する。OpenClaw 固有の定義は kit に持たない
+* [ADR-0012: Issue から merge までの流れを言語非依存の core にし、global に置く](decisions/0012-language-agnostic-delivery-flow.md) — Issue 起票・完了条件・worktree・PR レビュー対応・自動 merge の skills と git-workflow rule から Python/uv と特定ハーネスの前提を外し、通しの手順と起票の skill を足して global に分類した
 * [altairs-agent-dev-kit 設計書](superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — LoRAIro の開発標準を汎用化し独立リポジトリとして配布するための設計方針
 * [altairs-agent-dev-kit Implementation Plan](superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — skills / rules / hooks / agents / Codex 設定を汎用化し3経路で導入できる kit を構築する実装計画
 * [docs-freshness-audit skill 設計](superpowers/specs/2026-07-05-docs-freshness-audit-skill-design.md)
 * [導入ガイド](adoption.md) — skills / rules / hooks / agents / Codex 設定を任意リポジトリへ導入する3経路と設定上書き方法
+* [ハーネス別の配置先と kit の対応](harness-matrix.md) — Claude Code / Codex / Antigravity / OpenClaw が指示・rules・skills・agents・hooks をどこから読むかの調査結果と、kit がどこへ何を置くかの対応表
 * [Hook runtime の固定・復元契約](hook-runtime.md) — 作業 checkout の lock と override、共有 runtime、起動・復元失敗の扱い
 * [Portable hooks](portable-hooks.md) — kit が hook の共通ポリシーを持ち、導入先は override JSON とイベント登録だけを保持する配布モデルと、Claude / Codex 向け配線の説明
 * [skill 導入 / 更新 runbook](skill-install-runbook.md) — kit の skill を consumer リポジトリへ導入・更新する手順と、その裏にある配布モデル (canonical レイアウト・pin・更新経路)
