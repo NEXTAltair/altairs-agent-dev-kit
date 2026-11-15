@@ -289,6 +289,31 @@ def test_existing_canonical_skills_get_missing_harness_links_without_force(repo,
     assert (home / ".claude/skills/pr-autoloop/SKILL.md").is_file()
 
 
+@pytest.mark.skipif(os.name == "nt", reason="shell script の npx 代役は POSIX のみ")
+def test_existing_harness_skill_is_not_replaced_without_force(home, tmp_path, monkeypatch, capsys):
+    # Issue #39: ハーネス側に利用者が置いた同名 skill を skills.sh に link へ置き換えさせない。
+    log = tmp_path / "npx.log"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "npx"
+    fake.write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> "{log}"\n', encoding="utf-8")
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    mine = home / ".claude/skills/skill-creator"
+    mine.mkdir(parents=True)
+    (mine / "SKILL.md").write_text("MINE", encoding="utf-8")
+    args = ("install", "--scope", "global", "--home", str(home), "--harness", "claude,codex",
+            "--components", "skills", "--skill-source", str(KIT))
+
+    assert run(*args) == 0
+    assert "SKIP (ハーネス側に既存の skill あり" in capsys.readouterr().out
+    assert (mine / "SKILL.md").read_text(encoding="utf-8") == "MINE" and not mine.is_symlink()
+    assert " skill-creator " not in log.read_text(encoding="utf-8")
+
+    assert run(*args, "--force") == 0
+    assert " skill-creator " in log.read_text(encoding="utf-8").splitlines()[-1]
+
+
 def test_missing_npx_fails_before_anything_is_written(repo, home, tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("PATH", str(tmp_path))
     before = sorted(repo.rglob("*"))
