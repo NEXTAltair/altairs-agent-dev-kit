@@ -276,8 +276,28 @@ def skill_source(explicit: str | None) -> str:
 
 
 def skills_to_install(ctx: Context) -> list[str]:
+    if ctx.force:
+        return list(ctx.selected("skills"))
     canonical = ctx.root / ".agents/skills"
-    return [name for name in ctx.selected("skills") if ctx.force or not (canonical / name).exists()]
+    return [name for name in ctx.selected("skills")
+            if not (canonical / name).exists() and not foreign_harness_skills(ctx, name)]
+
+
+def foreign_harness_skills(ctx: Context, name: str) -> list[Path]:
+    """ハーネス側にある、canonical への link ではない同名の skill。
+
+    skills.sh は非対話モードでこれらを canonical への link に置き換えるため、--force なしでは導入しない。
+    """
+    canonical = ctx.root / ".agents/skills" / name
+    found = []
+    for directory in skill_link_dirs(ctx):
+        link = directory / name
+        if not (link.exists() or link.is_symlink()):
+            continue
+        if link.is_symlink() and os.path.normpath(os.path.join(directory, os.readlink(link))) == os.path.normpath(canonical):
+            continue
+        found.append(link)
+    return found
 
 
 def skill_link_dirs(ctx: Context) -> list[Path]:
@@ -319,7 +339,12 @@ def reconcile_skill_links(ctx: Context) -> None:
 def install_skills(ctx: Context, source: str | None, state: dict) -> None:
     names = skills_to_install(ctx)
     for name in sorted(set(ctx.selected("skills")) - set(names)):
-        print(f"SKIP (exists): skill {name}")
+        foreign = foreign_harness_skills(ctx, name)
+        if foreign and not (ctx.root / ".agents/skills" / name).exists():
+            print(f"SKIP (ハーネス側に既存の skill あり、--force で置き換え): skill {name}: "
+                  + ", ".join(str(path) for path in foreign))
+        else:
+            print(f"SKIP (exists): skill {name}")
     if names:
         command = ["npx", "--yes", "skills@1", "add", skill_source(source), "--skill", *names,
                    "--agent", *skill_agents(ctx), "-y"]
