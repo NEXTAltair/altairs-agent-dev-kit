@@ -24,10 +24,12 @@ Claude Code / Codex / Antigravity / OpenClaw のどれを使う場合も、OS �
 
 ### 導入コマンド
 
+`<tag>` は最新リリースタグ (Windows 修正を含む `v0.7.1` 以降) に置き換える。タグ未発行の `main` を使う場合は `--branch` なしで clone し、`install` 時に `--skill-source .` を付ける。
+
 **Windows (PowerShell)**:
 
 ```powershell
-git clone --branch v0.7.0 --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
+git clone --branch <tag> --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
 
 python scripts/agent_kit.py list                                                      # 部品の分類を確認
@@ -41,7 +43,7 @@ python scripts/agent_kit.py status --scope project --target C:\path\to\your-repo
 **macOS / Linux**:
 
 ```bash
-git clone --branch v0.7.0 --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
+git clone --branch <tag> --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
 
 python3 scripts/agent_kit.py install --scope global
