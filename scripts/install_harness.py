@@ -31,7 +31,7 @@ def write_config(path: Path, content: str, force: bool) -> None:
         if path.exists():
             raise FileExistsError(f"Review existing proposal before reinstalling: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    path.write_text(content, encoding="utf-8", newline="\n")
     print(f"INSTALL: {path}")
 
 
@@ -254,4 +254,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    for _stream in (sys.stdout, sys.stderr):
+        if hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     main()

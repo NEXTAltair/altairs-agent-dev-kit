@@ -15,7 +15,7 @@
 * [altairs-agent-dev-kit 設計書](superpowers/specs/2026-07-02-altairs-agent-dev-kit-design.md) — LoRAIro の開発標準を汎用化し独立リポジトリとして配布するための設計方針
 * [altairs-agent-dev-kit Implementation Plan](superpowers/plans/2026-07-02-altairs-agent-dev-kit.md) — skills / rules / hooks / agents / Codex 設定を汎用化し3経路で導入できる kit を構築する実装計画
 * [docs-freshness-audit skill 設計](superpowers/specs/2026-07-05-docs-freshness-audit-skill-design.md)
-* [導入ガイド](adoption.md) — skills / rules / hooks / agents / Codex 設定を任意リポジトリへ導入する3経路と設定上書き方法
+* [導入ガイド](adoption.md) — agent_kit.py を使った Windows / macOS / Linux での導入手順、hook override 設定、CI 組み込み、その他の導入経路
 * [ハーネス別の配置先と kit の対応](harness-matrix.md) — Claude Code / Codex / Antigravity / OpenClaw が指示・rules・skills・agents・hooks をどこから読むかの調査結果と、kit がどこへ何を置くかの対応表
 * [Hook runtime の固定・復元契約](hook-runtime.md) — 作業 checkout の lock と override、共有 runtime、起動・復元失敗の扱い
 * [Portable hooks](portable-hooks.md) — kit が hook の共通ポリシーを持ち、導入先は override JSON とイベント登録だけを保持する配布モデルと、Claude / Codex 向け配線の説明

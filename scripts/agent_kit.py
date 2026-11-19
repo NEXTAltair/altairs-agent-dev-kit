@@ -263,9 +263,9 @@ def skill_source(explicit: str | None) -> str:
         return str(Path(explicit).resolve()) if Path(explicit).is_dir() else explicit
     try:
         tag = subprocess.check_output(["git", "-C", str(KIT), "describe", "--tags", "--exact-match", "HEAD"],
-                                      text=True, stderr=subprocess.DEVNULL).strip()
+                                      text=True, encoding="utf-8", stderr=subprocess.DEVNULL).strip()
         origin = subprocess.check_output(["git", "-C", str(KIT), "remote", "get-url", "origin"],
-                                         text=True, stderr=subprocess.DEVNULL).strip()
+                                         text=True, encoding="utf-8", stderr=subprocess.DEVNULL).strip()
     except (subprocess.CalledProcessError, FileNotFoundError) as error:
         raise KitError("skills はリリースタグの checkout から導入する。未公開の変更を使う場合は"
                        " --skill-source <kit のローカルパス> を指定する") from error
@@ -294,7 +294,9 @@ def foreign_harness_skills(ctx: Context, name: str) -> list[Path]:
         link = directory / name
         if not (link.exists() or link.is_symlink()):
             continue
-        if link.is_symlink() and os.path.normpath(os.path.join(directory, os.readlink(link))) == os.path.normpath(canonical):
+        if (link.is_symlink()
+                and os.path.normcase(os.path.normpath(os.path.join(directory, os.readlink(link))))
+                == os.path.normcase(os.path.normpath(canonical))):
             continue
         found.append(link)
     return found
@@ -346,11 +348,13 @@ def install_skills(ctx: Context, source: str | None, state: dict) -> None:
         else:
             print(f"SKIP (exists): skill {name}")
     if names:
-        command = ["npx", "--yes", "skills@1", "add", skill_source(source), "--skill", *names,
+        # Windows では npx が npx.cmd なので、shutil.which で解決したパスを渡す (shell=True を使わずに起動できる)。
+        npx = shutil.which("npx") or "npx"
+        command = [npx, "--yes", "skills@1", "add", skill_source(source), "--skill", *names,
                    "--agent", *skill_agents(ctx), "-y"]
         if ctx.scope == "global":
             command.append("-g")
-        print("RUN: " + " ".join(command))
+        print("RUN: " + " ".join(["npx", *command[1:]]))
         if not ctx.dry_run:
             env = dict(os.environ)
             if ctx.scope == "global":
@@ -638,4 +642,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # Windows の既定 cp932 コンソールでも -X utf8 なしで日本語や記号を出せるようにする。
+    for _stream in (sys.stdout, sys.stderr):
+        if hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())
