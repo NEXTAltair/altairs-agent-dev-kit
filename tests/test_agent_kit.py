@@ -225,15 +225,42 @@ def test_unknown_harness_and_missing_target_fail_before_writing(repo, home, caps
     assert not (repo / ".claude").exists()
 
 
-@pytest.mark.skipif(os.name == "nt", reason="shell script の npx 代役は POSIX のみ")
+def install_fake_npx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, log: Path | None = None,
+                     exit_code: int = 0) -> None:
+    """Windows では npx.cmd、POSIX では npx を PATH 先頭へ置く。"""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    if os.name == "nt":
+        fake = bin_dir / "npx.cmd"
+        lines = ["@echo off"]
+        if log is not None:
+            logger = bin_dir / "fake_npx.py"
+            logger.write_text(
+                "import os, pathlib, sys\n"
+                f"log = pathlib.Path({str(log)!r})\n"
+                "home = os.environ.get('USERPROFILE') or os.environ.get('HOME', '')\n"
+                "with log.open('a', encoding='utf-8') as f:\n"
+                "    f.write(f'{os.getcwd()}|{home}|{\" \".join(sys.argv[1:])}\\n')\n",
+                encoding="utf-8",
+            )
+            lines.append(f'"{sys.executable}" -X utf8 "{logger}" %*')
+        lines.append(f"exit /b {exit_code}")
+        fake.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+    else:
+        fake = bin_dir / "npx"
+        lines = ["#!/bin/sh"]
+        if log is not None:
+            lines.append(f'printf "%s\\n" "$PWD|$HOME|$*" >> "{log}"')
+        if exit_code:
+            lines.append(f"exit {exit_code}")
+        fake.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+
+
 def test_skills_are_delegated_to_skills_sh_with_scope_and_agents(repo, home, tmp_path, monkeypatch):
     log = tmp_path / "npx.log"
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    fake = bin_dir / "npx"
-    fake.write_text(f'#!/bin/sh\nprintf "%s\\n" "$PWD|$HOME|$*" >> "{log}"\n', encoding="utf-8")
-    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    install_fake_npx(tmp_path, monkeypatch, log=log)
     (repo / ".agents/skills/lazy-import-refactor").mkdir(parents=True)  # 既存 skill は置き換えない
 
     assert project(repo, home, "--skill-source", str(KIT), components="skills") == 0
@@ -242,10 +269,10 @@ def test_skills_are_delegated_to_skills_sh_with_scope_and_agents(repo, home, tmp
 
     project_call, global_call = log.read_text(encoding="utf-8").splitlines()
     cwd, _, arguments = project_call.split("|")
-    assert Path(cwd) == repo
+    assert Path(cwd).resolve() == repo.resolve()
     assert arguments == f"--yes skills@1 add {KIT} --skill sqlalchemy-query-patterns --agent codex claude-code -y"
     _, used_home, arguments = global_call.split("|")
-    assert Path(used_home) == home
+    assert Path(used_home).resolve() == home.resolve()
     assert arguments.endswith("--agent codex claude-code antigravity -y -g")
     assert "--skill check-existing " in arguments and "pytest-qt-bdd" not in arguments
     # Issue から merge までの流れを担う skill は、どのプロジェクトでも使えるよう global に入る
@@ -289,16 +316,10 @@ def test_existing_canonical_skills_get_missing_harness_links_without_force(repo,
     assert (home / ".claude/skills/pr-autoloop/SKILL.md").is_file()
 
 
-@pytest.mark.skipif(os.name == "nt", reason="shell script の npx 代役は POSIX のみ")
 def test_existing_harness_skill_is_not_replaced_without_force(home, tmp_path, monkeypatch, capsys):
     # Issue #39: ハーネス側に利用者が置いた同名 skill を skills.sh に link へ置き換えさせない。
     log = tmp_path / "npx.log"
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    fake = bin_dir / "npx"
-    fake.write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> "{log}"\n', encoding="utf-8")
-    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    install_fake_npx(tmp_path, monkeypatch, log=log)
     mine = home / ".claude/skills/skill-creator"
     mine.mkdir(parents=True)
     (mine / "SKILL.md").write_text("MINE", encoding="utf-8")
@@ -322,14 +343,8 @@ def test_missing_npx_fails_before_anything_is_written(repo, home, tmp_path, monk
     assert sorted(repo.rglob("*")) == before
 
 
-@pytest.mark.skipif(os.name == "nt", reason="shell script の npx 代役は POSIX のみ")
 def test_ownership_is_recorded_when_a_later_step_fails(repo, home, tmp_path, monkeypatch):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    fake = bin_dir / "npx"
-    fake.write_text("#!/bin/sh\nexit 7\n", encoding="utf-8")
-    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    install_fake_npx(tmp_path, monkeypatch, exit_code=7)
 
     assert project(repo, home, "--skill-source", str(KIT), components="rules,agents,skills") == 1
     assert (repo / ".claude/rules/testing.md").is_file()
@@ -404,7 +419,8 @@ def test_modified_codex_hooks_keep_the_lock_they_depend_on(tmp_path, home, capsy
     # 残した登録は lock が無いと起動に失敗し、shell と編集を全て拒否する
     assert hooks.is_file() and lock.is_file()
     assert ".codex/hooks.json" in capsys.readouterr().out
-    command = json.loads(hooks.read_text(encoding="utf-8"))["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+    key = "commandWindows" if os.name == "nt" else "command"
+    command = json.loads(hooks.read_text(encoding="utf-8"))["hooks"]["PreToolUse"][0]["hooks"][0][key]
     import subprocess
     result = subprocess.run(command, shell=True, cwd=repo, text=True, capture_output=True,
                             input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "ls"}}))

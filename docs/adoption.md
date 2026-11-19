@@ -1,159 +1,76 @@
 ---
 type: Guide
 title: 導入ガイド
-description: skills / rules / hooks / agents / Codex 設定を任意リポジトリへ導入する3経路と設定上書き方法
-timestamp: 2026-07-02
+description: agent_kit.py を使った Windows / macOS / Linux での導入手順、hook override 設定、CI 組み込み、その他の導入経路
+timestamp: 2026-11-19
 ---
 # 導入ガイド
 
-`altairs-agent-dev-kit` は skills / rules / hooks / agents / Codex 設定を任意のリポジトリへ導入するための
-汎用コア kit。3 つの導入経路と、導入後にプロジェクト固有の値を上書きする方法をまとめる。
+`altairs-agent-dev-kit` を任意のリポジトリ・環境へ導入し、プロジェクト固有の設定を上書きする手順をまとめる。
 
-## 0. 複数ハーネスへの導入 (`scripts/agent_kit.py`)
+## 1. 推奨: `scripts/agent_kit.py` による導入
 
-Claude Code / Codex / Antigravity / OpenClaw のどれを使う場合も、まず `agent_kit.py` を使えばよい。
-global には core の部品、project にはスタック依存の部品を置く。配置先の一覧は
-[harness-matrix.md](harness-matrix.md)、設計判断は [ADR-0011](decisions/0011-multi-harness-framework.md) を参照。
+Claude Code / Codex / Antigravity / OpenClaw のどれを使う場合も、OS を問わず `scripts/agent_kit.py` (Python 3.10+、標準ライブラリのみ) を使う。
+部品は `global` (全プロジェクト共通の core 部品) と `project` (スタック依存の部品) に分かれる。配置先の一覧は [harness-matrix.md](harness-matrix.md)、設計判断は [ADR-0011](decisions/0011-multi-harness-framework.md) を参照。
+
+### 前提ツール
+
+| ツール | 必須条件 |
+|---|---|
+| Python 3.10+ | 必須 (Windows は `python`、macOS / Linux は `python3`) |
+| Git | リポジトリ取得と `--components hooks` 使用時に必須 |
+| Node.js (`npx`) | `skills` を導入する場合のみ必須 (`--components rules,agents` なら不要) |
+| [uv](https://docs.astral.sh/uv/) | `python` profile の rules / hooks を使う場合に推奨 (未導入時は警告が出る) |
+
+### 導入コマンド
+
+**Windows (PowerShell)**:
+
+```powershell
+git clone --branch v0.7.0 --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
+cd altairs-agent-dev-kit
+
+python scripts/agent_kit.py list                                                      # 部品の分類を確認
+python scripts/agent_kit.py install --scope global --dry-run                          # 予定を確認
+python scripts/agent_kit.py install --scope global
+python scripts/agent_kit.py install --scope project --target C:\path\to\your-repo
+python scripts/agent_kit.py install --scope project --target C:\path\to\your-repo --components all  # hooks も含める
+python scripts/agent_kit.py status --scope project --target C:\path\to\your-repo
+```
+
+**macOS / Linux**:
 
 ```bash
-python3 scripts/agent_kit.py list                                              # 部品の分類を確認
-python3 scripts/agent_kit.py install --scope global --dry-run                  # 予定を確認
+git clone --branch v0.7.0 --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
+cd altairs-agent-dev-kit
+
 python3 scripts/agent_kit.py install --scope global
 python3 scripts/agent_kit.py install --scope project --target /path/to/your-repo
-python3 scripts/agent_kit.py install --scope project --target /path/to/your-repo --components all   # hooks も
-python3 scripts/agent_kit.py status --scope project --target /path/to/your-repo
+python3 scripts/agent_kit.py install --scope project --target /path/to/your-repo --components all
 ```
 
-- **rules**: 原本は `rules/*.md`。Claude Code には `.claude/rules/`、Antigravity には `trigger:` frontmatter を付けて
-  `.agents/rules/` へ置く。Codex と OpenClaw は rules を自動で読まないので、`AGENTS.md` の
-  `<!-- agent-kit:begin -->` 〜 `<!-- agent-kit:end -->` に索引を書き、そこから `.agents/rules/` を読ませる。
-  区画の外の本文は変更しない。`CLAUDE.md` は編集しない
-- **agents**: Claude Code は `agents/*.md`、Codex は `codex/agents/*.toml`、Antigravity は `antigravity/agents/*.md`。
-  後の 2 つは生成物で、`agents/*.md` を変えたら `scripts/generate_codex_agents.py` と
-  `scripts/generate_antigravity_agents.py` で再生成する
-- **skills**: skills.sh CLI に委ねる。実体は `.agents/skills/` (global は `~/.agents/skills/`)
-- **OpenClaw**: repository で作業するときは作業フォルダの `AGENTS.md` と `.agents/skills/` を読むので、project scope の
-  導入がそのまま効く。agent workspace や `openclaw.json` には触れない
-- **更新と削除**: 導入記録 (`.agent-kit/install.json`、global は `~/.agents/agent-kit/install.json`) に内容ハッシュを
-  残す。kit が置いて未変更のファイルだけを更新・削除し、利用者が変えたファイルは `--force` まで残す
+### Windows での注意点
 
-hooks の override の書き方 (2 章) は導入経路によらず同じ。以下の 1 章は従来の Claude Code + Codex 向け経路。
+- `install.sh` (Git Bash / WSL) や `python -X utf8` の指定は不要。PowerShell からそのまま `python scripts/agent_kit.py` を実行できる。
+- `npx` (`npx.cmd`) は自動で解決される。
+- symlink 作成権限 (開発者モード / 管理者権限) が無い環境では、`.claude/skills/` 等へのリンク作成時に自動的にコピーへフォールバックする。
+- `--components all` (hooks 導入) で生成される Claude Code / Codex 向け起動設定は OS に合わせて `python` / `commandWindows` を出力する。
 
-## 1. 導入経路
+### 導入の仕組みと更新・削除
 
-いずれの経路も **uv がグローバルに導入されていること** を前提とする (hook の uv ガード、rules の共有 venv
-運用が uv 前提のため)。uv が PATH に無い場合、`install.sh` と `scripts/install_harness.py` は Git repository
-でない場合と同じく何も書き込まずに停止するので、先に [uv](https://docs.astral.sh/uv/) を導入する。
+- **rules**: 原本は `rules/*.md`。Claude Code には `.claude/rules/`、Antigravity には `trigger:` frontmatter を付けて `.agents/rules/` へ配置する。Codex / OpenClaw には `AGENTS.md` の `<!-- agent-kit:begin -->` 〜 `<!-- agent-kit:end -->` に索引を書き込む (区画外の本文と `CLAUDE.md` には触れない)。
+- **agents**: Claude Code は `agents/*.md`、Codex は `codex/agents/*.toml`、Antigravity は `antigravity/agents/*.md`。後二者は生成物であり、原本を変えたら `scripts/generate_codex_agents.py` / `scripts/generate_antigravity_agents.py` で再生成する。
+- **skills**: `skills.sh` CLI (`npx skills@1 add`) に委譲し、実体を `.agents/skills/` (global は `~/.agents/skills/`) に置く。既存のハーネス側 skill は `--force` なしでは置き換えない。詳細は [skill-install-runbook.md](skill-install-runbook.md) を参照。
+- **hooks**: project scope 専用 (Git repository root が前提)。内容ハッシュで固定した runtime と `.agent-kit/hooks.lock.json` を作成し、Codex 用 `.codex/hooks.json` を生成、Claude Code 用 JSON を標準出力へ表示する。`.claude/settings.json` には自動書き込みしないため、表示された JSON を `hooks` キーへマージする。`.agent-kit/runtimes/` と `.agent-kit/.pin-update` は `.gitignore` に追加し、lock と起動設定を Git 管理する。詳細は [hook-runtime.md](hook-runtime.md) を参照。
+- **更新と削除**: 導入記録 (`.agent-kit/install.json`、global は `~/.agents/agent-kit/install.json`) に内容ハッシュを保存する。kit が配置して未変更のファイルだけを更新・削除 (`uninstall`) し、利用者が編集したファイルは `--force` を付けるまで保持する。
 
-まず経路C (`install.sh --all`) を使えばよい。経路A/B は以下のような個別ニーズがある場合の
-選択肢: 経路A は Claude Code のプラグイン機構による hook 自動配線が欲しい場合、経路B は
-skill を 1 本だけ他 kit と混在導入したい場合に向く。
+## 2. プロジェクト層 override の書き方 (hooks)
 
-### 経路A: Claude Code プラグイン (skills + agents + hooks を一括)
+kit 同梱の `hooks/rules/*.default.json` は安全最小セットで、多くのゲートはデフォルト無効 (空リスト)。`hook_common.load_hook_rules()` が kit の default JSON と `<project_root>/.claude/hooks/rules/<name>.json` (override) を深いマージ (list は**連結**、dict は再帰マージ) で合成する。
 
-本リポジトリは `.claude-plugin/marketplace.json` により self-marketplace 化されているため、
-このリポジトリ自身を marketplace として登録できる。
+> **注意**: list は置換ではなく連結される。default 側の個別エントリを無効化したい場合は、kit を fork して default JSON を編集する必要がある。
 
-```bash
-claude plugin marketplace add NEXTAltair/altairs-agent-dev-kit
-claude plugin install altairs-agent-dev-kit@altairs-agent-dev-kit
-```
-
-これで `skills/`, `agents/`, `hooks/hooks.json` が自動検出され、Claude Code から利用可能になる
-(`.claude-plugin/plugin.json` の auto-discovery。`skills` / `agents` / `hooks` フィールドを
-明示していないのはデフォルト検出パスと完全一致するため二重指定を避けた設計)。
-
-hook を使うプロジェクトは Git repository が前提で、利用する kit 版の branch lock を事前に作成する。
-導入先が Git repository でない (または repository root でない) 場合、installer は何も書き込まずに
-メッセージを出して停止するので、先に `git init` を実行する。
-別途 clone した kit で `git checkout v0.7.0` を実行し、次を実行する (Linux は `python3`):
-
-```text
-python -X utf8 scripts/install_harness.py --target <project-directory> --runtime-only
-```
-
-`.agent-kit/hooks.lock.json` を Git 管理し、runtime ディレクトリは ignore する。
-plugin の `python_command` は Linux では既定の `python3`、Windows では `python` または
-Python executable の絶対パスを設定する。hook は作業中 Git checkout 内で起動する。
-plugin 更新でソースが変わっても branch pin は維持される。版更新・復元手順は
-[runtime 契約](hook-runtime.md) を参照。plugin とプロジェクト設定で同じ hook を二重登録しない。
-
-### 経路B: skills.sh (`npx skills add`) - skill 単体導入
-
-skill を 1 本ずつ選んで導入したい場合:
-
-```bash
-npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.7.0" --skill check-existing
-npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.7.0" --skill pr-maintainer
-npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.7.0" --skill okf-bundle
-```
-
-`skills/<name>/SKILL.md` が skills.sh の標準配置と一致しているため、任意の skill 名を
-`--skill` に指定できる。同梱 skill 一覧は `skills/` 配下のディレクトリ名を参照。
-
-### 経路C: install.sh - kit 全体を repo に導入する推奨経路
-
-Claude Code プラグイン機構を使わない環境、または Codex 環境向け。`--all` を指定すれば
-skills / rules / agents / hooks / Codex 設定をこれ 1 本で導入できる。
-
-```bash
-git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git
-cd altairs-agent-dev-kit
-git checkout v0.7.0
-./install.sh --target /path/to/your-repo --all
-```
-
-個別フラグでの選択導入も可能 (`install.sh` の実引数):
-
-```bash
-./install.sh --target /path/to/your-repo --skills           # canonical 実体 + Claude symlink (要 Node.js/npx)
-./install.sh --target /path/to/your-repo --rules            # rules/*.md → <repo>/.claude/rules/
-./install.sh --target /path/to/your-repo --agents           # agents/*.md → <repo>/.claude/agents/
-./install.sh --target /path/to/your-repo --hooks            # .agent-kit/runtimes/ + branch lock + 起動設定
-./install.sh --target /path/to/your-repo --codex            # .codex/config.toml + agents/*.toml
-./install.sh --target /path/to/your-repo --all --force      # kit 所有物を意図的に更新
-```
-
-`--skills` は skills.sh CLI (`npx skills@1 add`) に委譲する。既定の導入元は GitHub origin と
-checkout 中の公開タグであり、`skills-lock.json` に GitHub source/ref を記録する。
-実体は `.agents/skills/`、Claude 用の参照は `.claude/skills/` の相対 symlink。
-symlink 非対応環境では Claude 側をコピーする。
-既存の canonical または Claude 側 skill は `--force` なしでは保持する。kit 外の skill は更新しない。
-ディレクトリが無く lock だけ残る場合も、固定版と異なる source への置換は拒否する。
-
-**Node.js / npx が必要**で、npx は CLI 本体を初回に取得する。タグのない開発 checkout を試す場合だけ
-`--skill-source /absolute/path/to/kit` を指定する。ローカル source の lock は配布用にコミットしない。
-公開版の更新は新タグを checkout して `--skills --force` を実行し、lock 差分をレビューする。
-詳しくは [skill 導入・更新 runbook](skill-install-runbook.md) を参照。
-
-`--codex` が配布する `codex/agents/*.toml` は `agents/*.md` からの**生成物**であり、手編集
-しない。`agents/*.md` を変更したら `uv run python scripts/generate_codex_agents.py` で再生成
-する (CI が `--check` で drift を検出する)。語彙置換はハーネス名フレーズ `Claude Code` →
-`Codex` のみで、裸の `Claude` / `Anthropic` (製品・API への言及) は置換しない。
-`library-research` は WebFetch/WebSearch 前提のため Codex 版を生成しない。
-
-`--hooks` は内容ハッシュで固定した runtime と `.agent-kit/hooks.lock.json` を作成し、
-Claude の起動設定を標準出力へ表示する。`.claude/settings.json` には自動で書き込まないため、
-表示された JSON を `hooks` キーへマージする。Codex の設定は `.codex/hooks.json` に生成する。
-既存設定は `.new` へ提案し、consumer 固有 override は保持する。
-lock と起動設定を Git 管理し、runtime 配置先は gitignore に追加する。
-plugin 経路も事前に固定 kit から `--runtime-only` で branch lock を作成する。
-旧フラット配置からの移行、固有 hook の接続、復元手順は [Hook runtime 契約](hook-runtime.md) を参照。
-
-## 2. プロジェクト層 override の書き方
-
-kit が同梱する `hooks/rules/*.default.json` は言語非依存の安全最小セットで、多くのゲートは
-デフォルト無効 (空リスト)。`hook_common.load_hook_rules()` が
-`hooks/rules/<name>.default.json` (kit 側) と `<project_root>/.claude/hooks/rules/<name>.json`
-(導入先 override) を深いマージ (list は連結、dict は再帰マージ) で合成する。
-override ファイルを置くだけで有効化でき、kit 側のデフォルトファイルは編集不要。
-override の list は default の list に **連結** される (置換ではない)。default 側の
-個別エントリを無効化したい場合は override だけでは実現できず、kit の default JSON 自体を
-編集した fork を使う必要がある。
-
-### `.claude/hooks/rules/pre_commands.json` - uv ガード等の有効化例
-
-`uv sync`/`uv run --active` の並列実行事故のような、言語依存のガードを有効化したい場合の例:
+### `.claude/hooks/rules/pre_commands.json` — uv ガード等の有効化
 
 ```json
 {
@@ -165,14 +82,12 @@ override の list は default の list に **連結** される (置換ではな
 }
 ```
 
-- `blocked_commands` は kit デフォルトの配列に **連結** される (git 破壊系コマンドのブロックはそのまま有効)
-- `worktree_uv_guard: true` で「worktree 内の `uv` 実行は共有 venv (`UV_PROJECT_ENVIRONMENT=...`) を明示しないとブロック」が有効化される
+- `blocked_commands` は kit デフォルト (git 破壊系コマンドのブロック) に連結される。
+- `worktree_uv_guard: true` で、worktree 内の `uv` 実行に共有 venv (`UV_PROJECT_ENVIRONMENT`) を必須化する。
 
-### `.claude/hooks/rules/pre_edit_worktree.json` - 保護ディレクトリの上書き
+### `.claude/hooks/rules/pre_edit_worktree.json` — 保護ディレクトリの追加
 
-編集ゲート (`hook_pre_edit_worktree.py`) は共有 checkout 直下の保護ディレクトリ
-(デフォルト: `src`, `tests`) への編集をブロックし、`.agents/worktree/` 配下での編集のみ
-許可する。保護対象は override で **連結** 追加できる:
+共有 checkout 直下の保護ディレクトリ (既定: `src`, `tests`) への編集をブロックし、`.agents/worktree/` 配下での編集のみ許可する。保護対象は連結追加できる:
 
 ```json
 {
@@ -180,18 +95,11 @@ override の list は default の list に **連結** される (置換ではな
 }
 ```
 
-一時的にゲートを回避したい場合 (レビュー済みの hotfix 等) は環境変数
-`ALLOW_MAIN_EDIT=1` を付けてツールを実行すると編集が許可される (恒常運用はしない)。
-なお worktree の配置先 `.agents/worktree/` は kit の規約として固定
-(git-workflow ルール・worktree provider・編集ゲートが同じパスを前提に連携する)。
+レビュー済み hotfix 等で一時的に回避したい場合は環境変数 `ALLOW_MAIN_EDIT=1` を付ける (恒常運用はしない)。
 
-### `.claude/hooks/rules/response_monitor.json` - NG ワード例
+### `.claude/hooks/rules/response_monitor.json` — 応答品質 NG ワード
 
-kit デフォルトは `ng_words: []` (無効)。NG ワードはプロジェクト文化依存のため、
-自分のプロジェクトで実際に運用している応答品質ルールを override に書く。
-「確認した?テストした?」のような検証を促す小言は現行モデルには不要 (自発的に検証する) なので、
-文体・スコープ規律のように lint でもモデル既定でも決まらないものに絞る。
-以下は実例 (`keyword` / `keywords`+`threshold` の両形式):
+文体・スコープ規律のように lint でもモデル既定でも決まらないものに絞って設定する:
 
 ```json
 {
@@ -204,16 +112,13 @@ kit デフォルトは `ng_words: []` (無効)。NG ワードはプロジェク�
 }
 ```
 
-`keyword` (単数) と `keywords` (複数、`threshold` と組み合わせて出現回数の合計で判定) の
-どちらも使える。引用符 (`「」` / `""` / `` ` ` ``) 内の文字列はキーワード判定から除外される
-(引用・言及・例示を誤検知しない)。`exclude_patterns` (正規表現リスト) に一致する部分は
-**そのルールの判定対象からのみ**除去される - 譲歩構文やルール名の自己言及を許容しつつ
-素の出現だけを検出したい場合に使う (不正な正規表現は無視される)。
+- `keyword` (単数) と `keywords` + `threshold` (複数キーワードの合計回数) の両形式に対応。
+- 引用符 (`「」` / `""` / `` ` ` ``) 内は判定から除外される。
+- `exclude_patterns` (正規表現リスト) で特定表現だけをそのルールの判定対象から除外できる。
 
-### `.claude/hooks/rules/consistency.json` - required_env 宣言
+### `.claude/hooks/rules/consistency.json` — `required_env` 宣言
 
-`scripts/check_config_consistency.py` が読む設定。rules が前提とする環境変数を宣言し、
-`.claude/settings.json` の `env` に実在するかを検査する:
+`scripts/check_config_consistency.py` が参照する。rules が前提とする環境変数が `.claude/settings.json` の `env` に実在するかを検査する:
 
 ```json
 {
@@ -221,57 +126,76 @@ kit デフォルトは `ng_words: []` (無効)。NG ワードはプロジェク�
 }
 ```
 
-## 3. rules の追記ポイント
+## 3. 導入後の仕上げ
 
-`rules/*.md` は汎用原則のみを記載しており、具体パス・具体コマンド・Issue 番号などの
-プロジェクト固有値は意図的に含めていない。導入後は各 rule 内の「プロジェクト固有」に関する
-記述箇所 (共有 venv の絶対パス、CI filter 表、submodule 運用、ブランチ命名規則など) に、
-自分のリポジトリの具体値を追記すること。rules 本文の原則・判断フロー自体は変更不要。
+### rules のプロジェクト固有値を追記する
 
-## 4. プロジェクト固有スキルの実例
+`rules/*.md` は汎用原則のみを含む。導入後、各 rule 内の「プロジェクト固有」注記 (共有 venv パス、CI filter 表、submodule 運用、ブランチ命名規則など) に自リポジトリの具体値を追記する。
 
-汎用化できないドメイン固有 skill は kit に同梱せず、各プロジェクトの `.agents/skills/` /
-`.claude/skills/` に個別に置く。実例として `NEXTAltair/LoRAIro` の以下の skill を参照:
+### 設定整合 lint を CI に組み込む
 
-- [lorairo-qt-widget](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-qt-widget) - PySide6 ウィジェット実装パターン
-- [lorairo-repository-pattern](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-repository-pattern) - SQLAlchemy repository パターン
-- [lorairo-test-generator](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-test-generator) - pytest/pytest-qt テスト生成
-- [lorairo-mem](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-mem) - 長期記憶 (OpenClaw LTM) 連携
-- [lorairo-design-capture](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-design-capture) - デザインプロトタイプのキャプチャ手順
-
-自分のプロジェクトでも、ドメイン固有の知識・ワークフローは同様に `<project>-<domain>` 形式の
-skill として個別に育てるとよい。
-
-## 5. `scripts/check_config_consistency.py` を CI / hook に組み込む
-
-設定の巻き戻り事故 (`settings.json` から env や hook 配線が消えたのに rules は
-「設定済み」と書いたままになる drift) を検出する lint。導入先リポジトリに対して実行する:
+`scripts/check_config_consistency.py` は、`settings.json` の `env` や hook 配線が rules の前提から外れていないかを検査する (exit 0: 整合 / exit 1: 違反あり):
 
 ```bash
-python3 scripts/check_config_consistency.py --root /path/to/your-repo
+python scripts/check_config_consistency.py --root /path/to/your-repo
 ```
 
-- exit 0: 整合 (`OK: 設定整合に問題なし`)
-- exit 1: 違反あり (`VIOLATION: ...` を 1 行 1 件で標準出力に列挙)
-
-検査内容:
-1. `<root>/.claude/hooks/rules/consistency.json` の `required_env` の各キーが
-   `<root>/.claude/settings.json` の `env` に存在するか
-2. `settings.json` の hook 配線が参照するスクリプトが実在するか
-3. `<root>/.claude/hooks/*.py` のうち `settings.json` に未配線のもの (死んだ hook) を警告
-
-CI に組み込む場合の例 (GitHub Actions):
+GitHub Actions 組み込み例:
 
 ```yaml
 - name: 設定整合 lint
   run: python3 path/to/altairs-agent-dev-kit/scripts/check_config_consistency.py --root .
 ```
 
-pre-commit 相当で使う場合は PreToolUse hook から呼び出してもよい (kit 自体はこの lint を
-hook として配線していない - CI かローカルの明示実行を想定した独立 CLI)。
+検査内容:
+1. `.claude/hooks/rules/consistency.json` の `required_env` が `.claude/settings.json` の `env` に存在するか
+2. `settings.json` の hook 配線が参照するスクリプトが実在するか
+3. `.claude/hooks/*.py` のうち未配線のもの (死んだ hook) が無いか
+
+### プロジェクト固有スキルの育て方
+
+ドメイン固有 skill は kit に同梱せず、各プロジェクトの `.agents/skills/` 配下に `<project>-<domain>` 形式で置く。実例として `NEXTAltair/LoRAIro` の以下を参照:
+
+- [lorairo-qt-widget](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-qt-widget) — PySide6 ウィジェット実装パターン
+- [lorairo-repository-pattern](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-repository-pattern) — SQLAlchemy repository パターン
+- [lorairo-test-generator](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-test-generator) — pytest/pytest-qt テスト生成
+- [lorairo-design-capture](https://github.com/NEXTAltair/LoRAIro/tree/main/.agents/skills/lorairo-design-capture) — デザインプロトタイプのキャプチャ手順
+
+## 4. その他の導入経路 (個別ニーズ / 従来方式)
+
+通常の導入は 1 章の `scripts/agent_kit.py` を推奨する。個別ニーズがある場合のみ以下を使う。
+
+### Claude Code プラグイン (skills + agents + hooks をプラグイン機構で管理)
+
+```bash
+claude plugin marketplace add NEXTAltair/altairs-agent-dev-kit
+claude plugin install altairs-agent-dev-kit@altairs-agent-dev-kit
+```
+
+hook を使うリポジトリでは、事前に固定タグの kit から runtime lock を作成しておく:
+
+```bash
+python scripts/install_harness.py --target /path/to/your-repo --runtime-only
+```
+
+plugin の `python_command` は Linux が既定の `python3`、Windows では `python` または Python 実行ファイルの絶対パスを設定する。plugin とプロジェクト設定で同じ hook を二重登録しないこと。詳細は [hook-runtime.md](hook-runtime.md) を参照。
+
+### `skills.sh` 単体導入 (skill を 1 本ずつ選ぶ)
+
+```bash
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.7.0" --skill check-existing
+npx skills add "github:NEXTAltair/altairs-agent-dev-kit#v0.7.0" --skill pr-maintainer
+```
+
+同梱 skill 名は `skills/` 配下を参照。更新手順と footgun 対策は [skill-install-runbook.md](skill-install-runbook.md) を参照。
+
+### 従来の `install.sh` / `install_harness.py` (Claude Code + Codex のみ)
+
+v0.6 以前からの互換として残している。新規導入は `scripts/agent_kit.py` を使うこと。
+
+- **Bash (`install.sh`)**: `./install.sh --target /path/to/your-repo --all` (個別フラグ: `--skills` / `--rules` / `--agents` / `--hooks` / `--codex` / `--force` / `--skill-source`。グローバル `uv` 必須)
+- **hooks / Codex 単体 (`install_harness.py`)**: `python scripts/install_harness.py --target /path/to/your-repo --codex` (runtime 復元のみは `--runtime-only`)
 
 ## OKF バンドル運用について
 
-`docs/` は [Open Knowledge Format (OKF)](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
-バンドル。frontmatter が唯一の SSoT で、`docs/index.md` は frontmatter から生成される派生物のため
-手編集しない。更新は `skills/okf-bundle` スキル (`okf_validate.py` / `okf_index.py`) で行う。
+`docs/` は [Open Knowledge Format (OKF)](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) バンドル。frontmatter が唯一の SSoT で、`docs/index.md` は生成物のため手編集しない。更新時は `skills/okf-bundle` (`okf_validate.py` / `okf_index.py`) で検証・再生成する。
