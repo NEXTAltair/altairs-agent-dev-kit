@@ -26,19 +26,18 @@ AI エージェント向けの開発標準 (skills / rules / hooks / agents) を
 **Windows (PowerShell)**:
 
 ```powershell
-# 例: <tag> を最新リリースタグ (Windows 修正を含む v0.7.1 以降) に置き換える
-git clone --branch <tag> --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
+git clone --branch v0.7.1 --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
 ```
 
 **macOS / Linux**:
 
 ```bash
-git clone --branch <tag> --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
+git clone --branch v0.7.1 --depth 1 https://github.com/NEXTAltair/altairs-agent-dev-kit.git
 cd altairs-agent-dev-kit
 ```
 
-> **タグ未発行の `main` を使う場合 (開発版 / Windows 修正を先行利用する場合)**:
+> **開発中の `main` を使う場合**:
 > `git clone https://github.com/NEXTAltair/altairs-agent-dev-kit.git` で `main` を取得し、`install` 時に `--skill-source .` を付ける (公開リポジトリへコミットする `skills-lock.json` には後でリリースタグを指定する)。
 
 ### 2. 導入する
