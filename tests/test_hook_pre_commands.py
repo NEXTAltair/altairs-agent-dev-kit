@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from conftest import pretooluse_deny_reason
 
 HOOK = Path(__file__).parent.parent / "hooks" / "scripts" / "hook_pre_commands.py"
@@ -82,12 +84,16 @@ def test_draft_pr_allowed_when_disabled(tmp_path):
     assert pretooluse_deny_reason(result) is None
 
 
-def test_worktree_uv_guard_blocks_bare_uv(tmp_path):
+@pytest.mark.parametrize("worktree_base", [".agents/worktree", ".worktrees"])
+def test_worktree_uv_guard_blocks_bare_uv(tmp_path, worktree_base):
+    config = tmp_path / ".agent-kit" / "worktree.json"
+    config.parent.mkdir()
+    config.write_text(json.dumps({"directory": ".worktrees"}), encoding="utf-8")
     rules_dir = tmp_path / ".claude" / "hooks" / "rules"
     rules_dir.mkdir(parents=True)
     (rules_dir / "pre_commands.json").write_text(
         json.dumps({"worktree_uv_guard": True}), encoding="utf-8")
-    worktree_dir = tmp_path / ".agents" / "worktree" / "wt1"
+    worktree_dir = tmp_path / worktree_base / "wt1"
     worktree_dir.mkdir(parents=True)
     result = run_hook(
         "uv run pytest", worktree_dir,

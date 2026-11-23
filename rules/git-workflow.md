@@ -4,7 +4,7 @@ Issue解決・機能開発時のブランチ戦略とワークツリー運用ル
 
 ## 実装作業は worktree から開始(必須)
 
-Issue解決・機能開発・PR準備・複数ファイル実装は、**必ず `.agents/worktree/` 配下の専用 worktree から開始する**。共有 checkout (プロジェクトルート) で実装作業の edit / stage / commit / push / rebase をしない。
+Issue解決・機能開発・PR準備・複数ファイル実装は、**必ずプロジェクトの worktree 配置先にある専用 worktree から開始する**。共有 checkout (プロジェクトルート) で実装作業の edit / stage / commit / push / rebase をしない。
 
 ### worktree + PR を要さない例外(共有 checkout / メインブランチ直 push 可)
 
@@ -21,9 +21,9 @@ Issue解決・機能開発・PR準備・複数ファイル実装は、**必ず `
 判断基準: **アプリのソース (`src/`, `tests/` 等) や schema/migration を触るか**。触るなら worktree + PR、触らない docs/tooling chore なら共有 checkout で直接でよい。**ただし ADR は確定(Accepted/Implemented)まで worktree で隔離する**(上記参照)。
 
 ```bash
-# 実装着手時の標準手順
+# 実装着手時の標準手順 (WORKTREE_DIR は下記の設定から決める)
 git fetch origin
-git worktree add .agents/worktree/issue-123 -b fix/issue-123 origin/main
+git worktree add "$WORKTREE_DIR/issue-123" -b fix/issue-123 origin/main
 # 以降の編集・コミット・push はこの worktree 内で行う
 ```
 
@@ -70,12 +70,12 @@ git worktree add .agents/worktree/issue-123 -b fix/issue-123 origin/main
 ## ワークツリー運用
 
 ### 配置先
-- **必ず `.agents/worktree/` 配下に作成する**(プロジェクトツリー内に見えるので把握しやすい。kit の hook 群のデフォルト前提でもある)
+- 共有 checkout の `.agent-kit/worktree.json` に `directory` があればその値を配置先に使う。設定がない場合は `.agents/worktree/` を使う。以下の例ではその値を `WORKTREE_DIR` に設定済みとする。
 - プロジェクトルートより上流には作成しない(エクスプローラに出ず見づらい)
 
 ```bash
 # 正しい
-git worktree add .agents/worktree/fix-issue-123 -b fix/issue-123
+git worktree add "$WORKTREE_DIR/fix-issue-123" -b fix/issue-123
 
 # 禁止: プロジェクト外(上流)に作成
 git worktree add ../fix-issue-123 -b fix/issue-123
@@ -90,10 +90,10 @@ git worktree add ../fix-issue-123 -b fix/issue-123
 - マージ完了後は、PR 作業で使ったワークツリーを即削除する
 - 作業中のカレントディレクトリが削除対象の場合は、共有 checkout に戻ってから削除する
 - 複数の残骸をまとめて掃除する場合は、cleanup スクリプト/Makefile ターゲットがあればそれを使う
-- cleanup は `.agents/worktree/` 配下に限定し、未コミット変更がなく、merged PR またはメインブランチへ到達済みの worktree だけを削除する対象とする
+- cleanup は現在と従来の worktree 配置先に限定し、未コミット変更がなく、merged PR またはメインブランチへ到達済みの worktree だけを削除する対象とする
 
 ```bash
-git worktree remove .agents/worktree/fix-issue-123
+git worktree remove "$WORKTREE_PATH"  # git worktree list に記載された対象パス
 ```
 
 > **プロジェクト固有:** cleanup を自動化する Makefile ターゲット (`worktree-cleanup-merged` 等) があれば、ここにコマンドを追記する。

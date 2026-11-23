@@ -65,6 +65,21 @@ def test_removes_clean_worktree_created_by_pair_hook(tmp_path):
     assert str(worktree) not in listed.stdout
 
 
+def test_new_location_and_legacy_worktrees_can_be_removed_after_migration(tmp_path):
+    init_repo(tmp_path)
+    legacy = create(tmp_path, "legacy")
+    config = tmp_path / ".agent-kit" / "worktree.json"
+    config.parent.mkdir()
+    config.write_text(json.dumps({"directory": ".worktrees"}), encoding="utf-8")
+
+    current = create(tmp_path, "current")
+    assert current == tmp_path / ".worktrees" / "current"
+    for worktree in (legacy, current):
+        result = remove(tmp_path, worktree)
+        assert result.returncode == 0, result.stderr
+        assert not worktree.exists()
+
+
 def test_clears_registration_of_already_deleted_directory(tmp_path):
     # 登録が残ったままだと、同名の WorktreeCreate が "missing but already registered" で失敗する。
     import shutil
