@@ -1,13 +1,13 @@
 ---
 name: worktree-workflow
-description: "Operate Git worktrees under .agents/worktree/ for implementation work: one-time setup (.gitignore, VS Code detection settings), start a worktree with a branch, work inside it with the project's dependency environment, recover when the pre-edit hook blocks a shared-checkout edit, assign worktrees to parallel workers, hand off to PR, and clean up after merge. Use when starting implementation on an Issue/feature, when a hook message says to start from a worktree, or when asked to 「worktree 切って」「ワークツリー作って」「worktree 掃除」「ワークツリー削除」. Do NOT use for: PR polling/repair/merge (pr-maintainer, pr-autoloop) or deciding whether worktree is required (that policy lives in rules/git-workflow.md)."
+description: "Operate dedicated Git worktrees for implementation work: one-time setup (.gitignore, VS Code detection settings), start a worktree with a branch, work inside it with the project's dependency environment, recover when the pre-edit hook blocks a shared-checkout edit, assign worktrees to parallel workers, hand off to PR, and clean up after merge. Use when starting implementation on an Issue/feature, when a hook message says to start from a worktree, or when asked to 「worktree 切って」「ワークツリー作って」「worktree 掃除」「ワークツリー削除」. Do NOT use for: PR polling/repair/merge (pr-maintainer, pr-autoloop) or deciding whether worktree is required (that policy lives in rules/git-workflow.md)."
 metadata:
-  short-description: ".agents/worktree/ 配下の worktree の初期設定・作成・作業・hook ブロックからの復帰・並列割当・PR 引き継ぎ・掃除の手順。"
+  short-description: "専用 worktree の初期設定・作成・作業・hook ブロックからの復帰・並列割当・PR 引き継ぎ・掃除の手順。"
 ---
 
 # Worktree Workflow
 
-`.agents/worktree/<name>` に置く専用 worktree の **手順** を定める。「いつ worktree が必須か」「例外は何か」という
+プロジェクトの配置先に置く専用 worktree の **手順** を定める。「いつ worktree が必須か」「例外は何か」という
 方針は [rules/git-workflow.md](../../rules/git-workflow.md) が持つので、ここでは繰り返さない。
 このスキルは言語・スタック・ハーネスに依存しない (`git` と `gh` だけを使う)。Claude Code では `--worktree` や isolation 起動時に
 kit の WorktreeCreate hook が作成を代行するので、その場合は「作成後の手順」から入る。終了時の削除も
@@ -27,13 +27,14 @@ WorktreeRemove hook が代行するが、未コミット変更・lock・init 済
 
 | 項目 | 値 |
 |---|---|
-| 配置先 | `<project_root>/.agents/worktree/<name>` (上流や兄弟ディレクトリには作らない) |
+| 配置先 | `<project_root>/<worktree-directory>/<name>` |
 | `<name>` | ブランチ名の `/` を `-` にしたもの。例: `fix/issue-123` → `fix-issue-123` |
 | ブランチ | `fix/issue-<n>`, `feat/issue-<n>`, `refactor/issue-<n>` (git-workflow.md の命名) |
 | 起点 | `origin/<default branch>` を fetch した直後の先端 |
 
-`.agents/` は skills の実体 (`.agents/skills/`) と同じ親。エージェントは固定相対パスで、人は VS Code の
-Source Control から、どちらもここを見ればよい。
+共有 checkout の `.agent-kit/worktree.json` を確認し、`directory` を `WORKTREE_DIR` に設定する。
+設定がなければ `WORKTREE_DIR=.agents/worktree` を使う。既存 worktree の再利用と削除には
+`git worktree list` にある実際のパスを使う。
 
 ## Phase 0: One-time Setup (per repository)
 
@@ -42,10 +43,10 @@ Source Control から、どちらもここを見ればよい。
 1. **`.gitignore`**: worktree の中身が共有 checkout の `git status` に出ないようにする。
 
    ```bash
-   grep -qxF '.agents/worktree/' .gitignore 2>/dev/null || printf '.agents/worktree/\n' >> .gitignore
+   grep -qxF "/$WORKTREE_DIR/" .gitignore 2>/dev/null || printf '/%s/\n' "$WORKTREE_DIR" >> .gitignore
    ```
 
-2. **VS Code 検出設定** (推奨): フォルダ走査の既定深さは 1 段なので `.agents/worktree/<name>` は走査に
+2. **VS Code 検出設定** (推奨): フォルダ走査の既定深さは 1 段なので ネストされた配置先は走査に
    掛からない。worktree 検出 (`git.detectWorktrees`, 1.103 以降は既定有効) が拾うが、念のため
    `.vscode/settings.json` に次を置く。既存キーは上書きしない。
 
@@ -75,8 +76,8 @@ git fetch origin
 DEFAULT="$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')"
 BRANCH="fix/issue-123"
 NAME="${BRANCH//\//-}"
-git worktree add ".agents/worktree/$NAME" -b "$BRANCH" "origin/$DEFAULT"
-cd ".agents/worktree/$NAME"
+git worktree add "$WORKTREE_DIR/$NAME" -b "$BRANCH" "origin/$DEFAULT"
+cd "$WORKTREE_DIR/$NAME"
 ```
 
 - 既に同名 worktree があれば再利用する (`git worktree list` で確認)。作り直さない。
@@ -130,7 +131,7 @@ cd ".agents/worktree/$NAME"
 4. 退避したものを worktree 側で戻す:
 
    ```bash
-   cd .agents/worktree/$NAME && git stash pop
+   cd "$WORKTREE_DIR/$NAME" && git stash pop
    ```
 
 5. 以降の編集は worktree で続ける。共有 checkout の作業ツリーが clean に戻ったことを `git status` で確認する。
@@ -161,7 +162,7 @@ merge 直後に行う。放置しない。
 
 ```bash
 cd "$(git rev-parse --path-format=absolute --git-common-dir | xargs dirname)"   # 共有 checkout へ戻る
-git worktree remove ".agents/worktree/$NAME"
+git worktree remove "$WORKTREE_PATH"  # git worktree list に記載された実際のパス
 git branch -d "$BRANCH"
 git fetch --prune
 git worktree prune
@@ -170,7 +171,7 @@ git worktree prune
 - **cwd が削除対象**のときは先に共有 checkout へ移動する (上の 1 行目)。
 - 未コミット変更が残っていて `remove` が拒否されたら、中身を確認してから判断する。捨ててよいと確認できた
   場合だけ `git worktree remove --force`。確認できないなら止めて報告する。
-- まとめて掃除するときの対象は `.agents/worktree/` 配下で、未コミット変更が無く、ブランチが merge 済み
+- まとめて掃除するときの対象は現在と従来の worktree 配置先にあり、未コミット変更が無く、ブランチが merge 済み
   (`git branch --merged "origin/$DEFAULT"` に載る) のものだけ。導入先に cleanup 用 Makefile ターゲット
   があればそれを使う (git-workflow.md のプロジェクト固有欄を参照)。
 
@@ -185,7 +186,7 @@ git worktree list --porcelain
 | 症状 | 対処 |
 |---|---|
 | `fatal: '<branch>' is already checked out at ...` | そのブランチの worktree が既にある。`git worktree list` で場所を探して再利用 |
-| `git worktree add` 後に `.agents/worktree/x` が `git status` に出る | Phase 0 の `.gitignore` が未設定 |
+| `git worktree add` 後に worktree のパスが `git status` に出る | Phase 0 の `.gitignore` が未設定 |
 | (Python + uv) worktree 内の `uv run` が `.venv` を新規作成し始めた | `UV_PROJECT_ENVIRONMENT` が効いていない。Phase 2 の明示形で実行し、settings の env を直す |
 | VS Code に worktree が出ない | Phase 0 の設定を確認。`git.detectWorktreesLimit` (既定 50) 超過も疑う |
 | `remove` が `contains modified or untracked files` で失敗 | 中身を確認。必要なら commit/stash、捨ててよければ `--force` |
