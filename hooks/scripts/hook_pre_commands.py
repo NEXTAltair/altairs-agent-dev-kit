@@ -33,6 +33,7 @@ from hook_common import (
     emit_pretooluse_deny,
     find_project_root,
     find_shared_root,
+    worktree_roots,
     get_log_dir,
     hook_deadline,
     load_hook_rules,
@@ -42,6 +43,7 @@ from hook_common import (
 PROJECT_ROOT: Path = Path.cwd()
 LOG_DIR: Path = get_log_dir(PROJECT_ROOT)
 WORKTREE_ROOT: Path = PROJECT_ROOT / ".agents" / "worktree"
+LEGACY_WORKTREE_ROOT: Path = WORKTREE_ROOT
 SHARED_UV_ENV_NAME = "UV_PROJECT_ENVIRONMENT"
 SHARED_UV_ENV_VALUE: str = str(PROJECT_ROOT / ".venv")
 # この hook の登録 timeout (Claude: hooks/hooks.json、Codex: install_harness.CODEX_HOOKS)。打ち切られると、
@@ -93,19 +95,21 @@ def check_blocked(command: str, rules: dict[str, Any]) -> str | None:
 
 
 def _is_under_worktree(path: str | Path) -> bool:
-    """パスが <project_root>/.agents/worktree 配下かどうかを判定する。"""
+    """パスが <project_root> の worktree ディレクトリ 配下かどうかを判定する。"""
     try:
-        return Path(path).expanduser().resolve().is_relative_to(WORKTREE_ROOT)
+        resolved = Path(path).expanduser().resolve()
+        return resolved.is_relative_to(WORKTREE_ROOT) or resolved.is_relative_to(LEGACY_WORKTREE_ROOT)
     except (OSError, RuntimeError):
-        return str(path).startswith(f"{WORKTREE_ROOT}/")
+        return str(path).startswith((f"{WORKTREE_ROOT}/", f"{LEGACY_WORKTREE_ROOT}/"))
 
 
 def _command_cd_worktree(command: str) -> bool:
-    """command 内の `cd <project_root>/.agents/worktree/...` を検出する。"""
+    """command 内の `cd <project_root> の worktree ディレクトリ/...` を検出する。"""
     try:
         parts = [part.strip("\"'") for part in shlex.split(command, posix=os.name != "nt")]
     except ValueError:
-        pattern = rf"\bcd\s+{re.escape(str(WORKTREE_ROOT))}(?:/|\b)"
+        roots = "|".join(re.escape(str(root)) for root in (WORKTREE_ROOT, LEGACY_WORKTREE_ROOT))
+        pattern = rf"\bcd\s+(?:{roots})(?:/|\b)"
         return bool(re.search(pattern, command))
 
     for index, part in enumerate(parts[:-1]):
@@ -343,11 +347,16 @@ def emit_block(reason: str) -> None:
 
 def main() -> None:
     """メイン処理"""
-    global PROJECT_ROOT, LOG_DIR, WORKTREE_ROOT, SHARED_UV_ENV_VALUE
+    global PROJECT_ROOT, LOG_DIR, WORKTREE_ROOT, LEGACY_WORKTREE_ROOT, SHARED_UV_ENV_VALUE
     PROJECT_ROOT = find_project_root()
     LOG_DIR = get_log_dir(PROJECT_ROOT)
     shared_root = find_shared_root(PROJECT_ROOT)
-    WORKTREE_ROOT = shared_root / ".agents" / "worktree"
+    try:
+        roots = worktree_roots(shared_root)
+    except RuntimeError as error:
+        emit_block(str(error))
+        return
+    WORKTREE_ROOT, LEGACY_WORKTREE_ROOT = roots[0], roots[-1]
     SHARED_UV_ENV_VALUE = str(shared_root / ".venv")
 
     log_debug("=== Pre-Commands Hook ===")

@@ -37,10 +37,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import find_project_root, find_shared_root
-
-# isolation worktree の配置先: リポジトリ内 .agents/worktree/。
-WORKTREE_SUBDIR = ".agents/worktree"
+from hook_common import find_project_root, find_shared_root, worktree_roots
 
 
 def _sanitize(name: str) -> str:
@@ -60,7 +57,11 @@ def main() -> None:
 
     repo = Path(data.get("cwd") or find_project_root()).resolve()
     shared_root = find_shared_root(repo)
-    worktree_base = shared_root / WORKTREE_SUBDIR
+    try:
+        worktree_base = worktree_roots(shared_root)[0]
+    except RuntimeError as error:
+        sys.stderr.write(f"WorktreeCreate hook: {error}")
+        sys.exit(1)
     # 現行スキーマは name。旧 payload 形状 (worktree_name) にもフォールバックする。
     worktree_path = worktree_base / _sanitize(data.get("name") or data.get("worktree_name") or "agent")
     source_ref = data.get("source_ref") or "HEAD"

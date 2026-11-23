@@ -85,9 +85,22 @@ kit 同梱の `hooks/rules/*.default.json` は安全最小セットで、多く�
 - `blocked_commands` は kit デフォルト (git 破壊系コマンドのブロック) に連結される。
 - `worktree_uv_guard: true` で、worktree 内の `uv` 実行に共有 venv (`UV_PROJECT_ENVIRONMENT`) を必須化する。
 
+### `.agent-kit/worktree.json` — worktree の配置先
+
+Codex の `workspace-write` は `.agents/` を再帰的に保護する。作業用 checkout をその外に置く場合は、
+共有 checkout に次の設定を追跡し、`.gitignore` に `/.worktrees/` を追加する。
+
+```json
+{"directory": ".worktrees"}
+```
+
+指定する値は共有 checkout 直下の隠しディレクトリ名。設定がない場合の配置先は `.agents/worktree/`。
+設定後も従来の配置先にある worktree は uv ガードと削除フックの対象になる。Codex 側で作成する
+ときは `git worktree add .worktrees/<name> ...` を使う。
+
 ### `.claude/hooks/rules/pre_edit_worktree.json` — 保護ディレクトリの追加
 
-共有 checkout 直下の保護ディレクトリ (既定: `src`, `tests`) への編集をブロックし、`.agents/worktree/` 配下での編集のみ許可する。保護対象は連結追加できる:
+共有 checkout 直下の保護ディレクトリ (既定: `src`, `tests`) への編集をブロックする。保護対象は連結追加できる:
 
 ```json
 {

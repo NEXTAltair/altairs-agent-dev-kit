@@ -7,6 +7,7 @@ kit の hook はプロジェクト固有パスをハードコードしない。
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -32,6 +33,31 @@ def _default_rules_dir() -> Path:
 
 DEFAULT_RULES_DIR = _default_rules_dir()
 _IMPORTED_AT = time.monotonic()
+
+
+def worktree_roots(shared_root: Path) -> tuple[Path, ...]:
+    """指定された新規配置先と、移行前の worktree 配置先を返す。"""
+    legacy = shared_root / ".agents" / "worktree"
+    config_path = shared_root / ".agent-kit" / "worktree.json"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return (legacy,)
+    except (OSError, ValueError) as error:
+        raise RuntimeError(f"worktree 設定を読み込めません: {config_path}") from error
+    directory = config.get("directory") if isinstance(config, dict) else None
+    if (
+        not isinstance(directory, str)
+        or not re.fullmatch(r"\.[A-Za-z0-9_-]+", directory)
+        or directory.lower() in {".git", ".agents", ".codex", ".aws", ".agent-kit", ".claude", ".venv"}
+    ):
+        raise RuntimeError(
+            f"worktree.directory には予約名以外のルート直下の隠しディレクトリを指定してください: {config_path}"
+        )
+    configured = shared_root / directory
+    if configured.resolve() != shared_root.resolve() / directory:
+        raise RuntimeError(f"worktree.directory にリンクされた配置先は使えません: {configured}")
+    return (configured, legacy)
 
 
 def hook_deadline(registered_timeout: float, margin: float) -> float:

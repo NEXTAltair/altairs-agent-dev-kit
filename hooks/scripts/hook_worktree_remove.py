@@ -13,7 +13,7 @@ Claude Code が渡す payload:
   {session_id, transcript_path, cwd, hook_event_name: "WorktreeRemove", worktree_path}
 
 安全側の制約 (どれか 1 つでも満たさなければ削除せず失敗を返す):
-- WorktreeCreate hook の配置先 (共有 checkout の `.agents/worktree/` 直下) にあること
+- WorktreeCreate hook の配置先 (共有 checkout の worktree ディレクトリ直下) にあること
 - hook を起動した checkout と同じ repository に登録された linked worktree であること
 - worktree の HEAD が、worktree を消しても残る ref (ブランチ・リモート追跡・タグ等) から到達できること。
   WorktreeCreate は detached HEAD で作るので、ブランチを切らずに commit した worktree を消すと
@@ -36,10 +36,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_common import find_project_root, find_shared_root, hook_deadline, remaining_seconds
+from hook_common import find_project_root, find_shared_root, hook_deadline, remaining_seconds, worktree_roots
 
-# hook_worktree_create.py の WORKTREE_SUBDIR と一致させる。
-WORKTREE_SUBDIR = ".agents/worktree"
 # この hook の登録 timeout (hooks/hooks.json)。プロセス起動から数えて、この時間内に応答を返す。
 REGISTERED_TIMEOUT_SECONDS = 60
 TIMEOUT_MARGIN_SECONDS = 5
@@ -207,14 +205,14 @@ def main() -> None:
 
     try:
         shared_root = find_shared_root(find_project_root()).resolve()
-        worktree_base = (shared_root / WORKTREE_SUBDIR).resolve()
+        worktree_bases = tuple(path.resolve() for path in worktree_roots(shared_root))
         target = Path(raw_path).expanduser().resolve()
     except (OSError, RuntimeError) as e:
         _fail(f"パス解決失敗: {e}")
 
-    # WorktreeCreate hook が作る場所 (.agents/worktree/<name>) 以外は扱わない。
-    if target.parent != worktree_base:
-        _fail(f"{target} は {worktree_base} 直下ではないため削除しません")
+    # WorktreeCreate hook の現在と従来の配置先の直下だけを扱う。
+    if target.parent not in worktree_bases:
+        _fail(f"{target} は worktree 配置先の直下ではないため削除しません")
 
     try:
         registered = _registered_worktrees(shared_root, deadline)
